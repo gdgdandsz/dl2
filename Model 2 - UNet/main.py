@@ -10,41 +10,46 @@ from tqdm import tqdm
 #import wandb
 
 
-class SegmentationDataSet(Dataset):
+from PIL import Image
+import numpy as np
+import torch
 
+class SegmentationDataSet(Dataset):
     def __init__(self, video_dir, transform=None):
         self.transforms = transform
         self.images, self.masks = [], []
         for i in video_dir:
             imgs = os.listdir(i)
-            self.images.extend([i + '/' + img for img in imgs if not img.startswith(
-                'mask')])  # /content/gdrive/MyDrive/Dataset_Studentnew/Dataset_Student/train/video_
-        # print(self.images[1000])
+            self.images.extend([i + '/' + img for img in imgs if not img.startswith('mask')])
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, index):
-        img = np.array(Image.open(self.images[index]))
-        x = self.images[index].split('/')
-        image_name = x[-1]
-        mask_index = int(image_name.split("_")[1].split(".")[0])
-        x = x[:-1]
-        mask_path = '/'.join(x)
-        mask = np.load(mask_path + '/mask.npy')
-        # Check if the requested index is within the bounds
-        mask_index = 19  # Example index that might be out of bounds
-        if mask_index >= mask.shape[0]:  # Check if the index is out of bounds
-            mask_index = mask.shape[0] - 1  # Use the last available mask if out of bounds
+        try:
+            img = np.array(Image.open(self.images[index]))
+            x = self.images[index].split('/')
+            image_name = x[-1]
+            mask_index = int(image_name.split("_")[1].split(".")[0])
+            x = x[:-1]
+            mask_path = '/'.join(x)
+            mask = np.load(mask_path + '/mask.npy')
+            
+            if mask_index >= mask.shape[0]:
+                raise IndexError(f'Requested index {mask_index} exceeds mask dimensions {mask.shape[0]}')
 
-        mask = mask[mask_index, :, :]
+            mask = mask[mask_index, :, :]
 
-        if self.transforms is not None:
-            aug = self.transforms(image=img, mask=mask)
-            img = aug['image']
-            mask = aug['mask']
+            if self.transforms is not None:
+                aug = self.transforms(image=img, mask=mask)
+                img = aug['image']
+                mask = aug['mask']
 
-        return img, mask
+            return img, mask
+        except IndexError as e:
+            print(f"Skipping index {index} - {str(e)}")
+            return None  # You can also choose to return a dummy data with the same shape or handle differently
+
 
 
 class encoding_block(nn.Module):
