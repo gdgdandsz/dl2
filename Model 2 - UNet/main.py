@@ -7,11 +7,16 @@ from PIL import Image
 import torch.nn as nn
 from torch.optim import Adam
 from tqdm import tqdm
-import torchvision.transforms as transforms
 #import wandb
 
-from models import UNet
-from datasets import SegmentationDataSet
+
+from PIL import Image
+import numpy as np
+import torch
+
+from PIL import Image
+import numpy as np
+import torch
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(DEVICE)
