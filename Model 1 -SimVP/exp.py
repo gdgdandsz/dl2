@@ -10,6 +10,7 @@ from tqdm import tqdm
 from API import *
 from utils import *
 import wandb
+import itertools
 
 class Exp:
     def __init__(self, args, wandb_config):
