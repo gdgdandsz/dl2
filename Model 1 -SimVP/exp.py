@@ -146,10 +146,11 @@ class Exp:
         self.model.load_state_dict(torch.load(best_model_path))
         return self.model
 
-    def vali(self, vali_loader):
+    def vali(self, vali_loader, limit_percent=0.8):
         self.model.eval()
         preds_lst, trues_lst, total_loss = [], [], []
-        vali_pbar = tqdm(vali_loader)
+        total_batches = int(len(vali_loader) * limit_percent)
+        vali_pbar = tqdm(itertools.islice(vali_loader, total_batches), total=total_batches)
         for i, (batch_x, batch_y) in enumerate(vali_pbar):
             if i * batch_x.shape[0] > 1000:
                 break
