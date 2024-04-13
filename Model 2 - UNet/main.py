@@ -228,7 +228,7 @@ if __name__ == "__main__":
 
     # hyperparameters
 
-    LEARNING_RATE = 1e-5
+    LEARNING_RATE = 1e-6
     num_epochs = 40
     max_patience = 3
     epochs_no_improve = 0
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     # loss criterion, optimizer
 
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-5)
+    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-8)
     scaler = torch.cuda.amp.GradScaler()
 
     # Train loop
