@@ -13,10 +13,8 @@ from tqdm import tqdm
 from PIL import Image
 import numpy as np
 import torch
-
-from PIL import Image
-import numpy as np
-import torch
+import torchvision.transforms as transforms
+#import wandb
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(DEVICE)
