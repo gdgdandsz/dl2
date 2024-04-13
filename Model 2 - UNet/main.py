@@ -180,8 +180,8 @@ if __name__ == "__main__":
 
     # wandb.init(project='unet-seg', config=cfg)
 
-    train_set_path = '../dataset/train/video_' #Change this to your train set path
-    val_set_path = '../dataset/val/video_' #Change this to your validation path
+    train_set_path = '/scratch/xz3645/test/dl/Dataset_Student/train/video_' #Change this to your train set path
+    val_set_path = '/scratch/xz3645/test/dl/Dataset_Student/val/video_' #Change this to your validation path
 
     train_data_dir = [train_set_path + str(i) for i in range(0, 1000)]
     train_dataset = SegmentationDataSet(train_data_dir, None)
