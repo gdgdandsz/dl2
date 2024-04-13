@@ -32,6 +32,11 @@ class SegmentationDataSet(Dataset):
         x = x[:-1]
         mask_path = '/'.join(x)
         mask = np.load(mask_path + '/mask.npy')
+        # Check if the requested index is within the bounds
+        mask_index = 19  # Example index that might be out of bounds
+        if mask_index >= mask.shape[0]:  # Check if the index is out of bounds
+            mask_index = mask.shape[0] - 1  # Use the last available mask if out of bounds
+
         mask = mask[mask_index, :, :]
 
         if self.transforms is not None:
