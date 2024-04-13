@@ -14,10 +14,16 @@ from PIL import Image
 import numpy as np
 import torch
 
+from PIL import Image
+import numpy as np
+import torch
+
 class SegmentationDataSet(Dataset):
-    def __init__(self, video_dir, transform=None):
+    def __init__(self, video_dir, transform=None, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
         self.transforms = transform
         self.images, self.masks = [], []
+        self.dummy_image = np.zeros(dummy_image_shape, dtype=np.uint8)  # Example dummy image
+        self.dummy_mask = np.zeros(dummy_mask_shape, dtype=np.uint8)   # Example dummy mask
         for i in video_dir:
             imgs = os.listdir(i)
             self.images.extend([i + '/' + img for img in imgs if not img.startswith('mask')])
@@ -46,9 +52,17 @@ class SegmentationDataSet(Dataset):
                 mask = aug['mask']
 
             return img, mask
-        except IndexError as e:
-            print(f"Skipping index {index} - {str(e)}")
-            return None  # You can also choose to return a dummy data with the same shape or handle differently
+        except (IndexError, FileNotFoundError) as e:
+            print(f"Returning dummy data for index {index} - {str(e)}")
+            # Return dummy data that matches the shape of your inputs and targets
+            dummy_img = self.dummy_image.copy()
+            dummy_mask = self.dummy_mask.copy()
+            if self.transforms is not None:
+                aug = self.transforms(image=dummy_img, mask=dummy_mask)
+                dummy_img = aug['image']
+                dummy_mask = aug['mask']
+            return dummy_img, dummy_mask
+
 
 
 
