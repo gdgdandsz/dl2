@@ -234,12 +234,14 @@ if __name__ == "__main__":
     epochs_no_improve = 0
     early_stop = False
     SMOOTH = 1e-6
-
+    import torch.optim as optim
+    from torch.optim.lr_scheduler import ReduceLROnPlateau
     # loss criterion, optimizer
 
     loss_fn = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-8)
     scaler = torch.cuda.amp.GradScaler()
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
 
     # Train loop
     for epoch in range(num_epochs):
@@ -303,6 +305,7 @@ if __name__ == "__main__":
 
             mean_thresholded_iou = sum(ious) / len(ious)
             avg_val_loss = sum(val_losses) / len(val_losses)
+            scheduler.step(avg_val_loss)
             print(f"Epoch: {epoch}, avg IoU: {mean_thresholded_iou}, avg val loss: {avg_val_loss}")
 
         if avg_val_loss < last_val_loss:
