@@ -18,7 +18,7 @@ def create_parser():
     # dataset parameters
     parser.add_argument('--batch_size', default=4, type=int, help='Batch size')
     parser.add_argument('--val_batch_size', default=4, type=int, help='Batch size')
-    parser.add_argument('--data_root', default='/scratch/ad6489/dlproject/frame-pred/dataset/unlabeled')
+    parser.add_argument('--data_root', default='/scratch/xz3645/test/dl/Dataset_Student/unlabeled')
     parser.add_argument('--dataname', default='moving_objects', choices=['moving_objects'])
     parser.add_argument('--num_workers', default=8, type=int)
 
