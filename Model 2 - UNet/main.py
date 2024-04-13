@@ -19,6 +19,43 @@ import torchvision.transforms as transforms
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(DEVICE)
 
+from PIL import Image
+import torchvision.transforms as transforms
+
+class SegmentationDataSet(Dataset):
+    def __init__(self, video_dir, transform=None):
+        self.transform = transform
+        self.images, self.masks = [], []
+        for i in video_dir:
+            imgs = os.listdir(i)
+            self.images.extend([i + '/' + img for img in imgs if not img.startswith('mask')])
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, index):
+        img_path = self.images[index]
+        img = Image.open(img_path)  # 直接以PIL形式打开
+        x = img_path.split('/')
+        image_name = x[-1]
+        mask_index = int(image_name.split("_")[1].split(".")[0])
+        video_folder = '/'.join(x[:-1])
+        mask_path = os.path.join(video_folder, 'mask.npy')
+        mask = np.load(mask_path)
+        
+        if mask_index >= mask.shape[0]:
+            mask_index = mask.shape[0] - 1  # 如果索引超出范围，使用最后一个可用帧
+
+        mask = mask[mask_index, :, :]
+
+        if self.transform is not None:
+            img = self.transform(img)  # 应用转换
+
+        # 如果还需要转换mask，请在此处添加相应的代码（确保mask是PIL图像）
+
+        return img, mask
+
+
 # 数据增强
 data_transforms = transforms.Compose([
     transforms.RandomHorizontalFlip(),
