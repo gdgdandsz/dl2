@@ -215,7 +215,7 @@ if __name__ == "__main__":
     # loss criterion, optimizer
 
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
+    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-5)
     scaler = torch.cuda.amp.GradScaler()
 
     # Train loop
