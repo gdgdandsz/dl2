@@ -33,16 +33,19 @@ class SegmentationDataSet(Dataset):
 
     def __getitem__(self, index):
         try:
-            img = np.array(Image.open(self.images[index]))
-            x = self.images[index].split('/')
+            img_path = self.images[index]
+            img = np.array(Image.open(img_path))
+            x = img_path.split('/')
             image_name = x[-1]
             mask_index = int(image_name.split("_")[1].split(".")[0])
-            x = x[:-1]
-            mask_path = '/'.join(x)
-            mask = np.load(mask_path + '/mask.npy')
+            video_folder = '/'.join(x[:-1])
+            mask_path = os.path.join(video_folder, 'mask.npy')
+            mask = np.load(mask_path)
             
             if mask_index >= mask.shape[0]:
-                raise IndexError(f'Requested index {mask_index} exceeds mask dimensions {mask.shape[0]}')
+                # If requested index exceeds mask dimensions, use the last available frame
+                print(f"Requested index {mask_index} exceeds mask dimensions {mask.shape[0]}, using last available index.")
+                mask_index = mask.shape[0] - 1
 
             mask = mask[mask_index, :, :]
 
@@ -62,6 +65,7 @@ class SegmentationDataSet(Dataset):
                 dummy_img = aug['image']
                 dummy_mask = aug['mask']
             return dummy_img, dummy_mask
+
 
 
 
