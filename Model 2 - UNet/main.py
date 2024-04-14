@@ -239,7 +239,7 @@ if __name__ == "__main__":
     # loss criterion, optimizer
 
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-8)
+    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-7)
     scaler = torch.cuda.amp.GradScaler()
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
 
