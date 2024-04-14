@@ -44,42 +44,64 @@ class RandomGeometricTransforms:
         return image, mask
 
 
-from torchvision import transforms
+import os
+import torch
+import numpy as np
+from torch.utils.data import Dataset
+from PIL import Image
+import torchvision.transforms.functional as TF
+import random
 
 class SegmentationDataSet(Dataset):
-    def __init__(self, video_dir, transform=None, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),  # 将 PIL 图像转换为张量
-            # 这里可以加入其他数据增强的转换
-            transforms.RandomHorizontalFlip(),
-            transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1)
-        ])
+    def __init__(self, video_dir, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
+        self.images, self.masks = [], []
         self.dummy_image = torch.zeros((3,) + dummy_image_shape)  # 直接创建张量
         self.dummy_mask = torch.zeros(dummy_mask_shape, dtype=torch.long)  # 掩码通常为长整型
-        self.images, self.masks = [], []
         for i in video_dir:
             imgs = os.listdir(i)
-            self.images.extend([i + '/' + img for img in imgs if not img.startswith('mask')])
+            self.images.extend([os.path.join(i, img) for img in imgs if not img.startswith('mask')])
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, index):
+        img_path = self.images[index]
+        img = Image.open(img_path).convert('RGB')
+        
+        # Extract mask index and path
+        mask_index = int(img_path.split('_')[-2])
+        video_folder = '/'.join(img_path.split('/')[:-1])
+        mask_path = os.path.join(video_folder, f'mask_{mask_index:05d}.npy')
+        
         try:
-            img_path = self.images[index]
-            img = Image.open(img_path).convert('RGB')
-            mask_index = int(img_path.split('_')[-2])
-            mask_path = '/'.join(img_path.split('/')[:-1]) + f'/mask_{mask_index:05d}.npy'
             mask = Image.fromarray(np.load(mask_path))
+        except IndexError:
+            # Handle the case where mask index is out of bounds
+            mask = Image.fromarray(np.load(mask_path)[0])
 
-            if self.transform:
-                img = self.transform(img)
-                mask = self.transform(mask)
+        # Apply transformations
+        img, mask = self.apply_transforms(img, mask)
 
-            return img, mask
-        except (IndexError, FileNotFoundError) as e:
-            print(f"Returning dummy data for index {index} - {str(e)}")
-            return self.dummy_image, self.dummy_mask
+        return img, mask
+
+    def apply_transforms(self, img, mask):
+        # Apply random rotation
+        angle = random.uniform(-30, 30)
+        img = TF.rotate(img, angle)
+        mask = TF.rotate(mask, angle, fill=0)
+
+        # Apply random horizontal flip
+        if random.random() > 0.5:
+            img = TF.hflip(img)
+            mask = TF.hflip(mask)
+
+        return TF.to_tensor(img), TF.to_tensor(mask)
+
+# Example usage:
+# video_dirs = ['/path/to/videos']
+# dataset = SegmentationDataSet(video_dirs)
+# loader = DataLoader(dataset, batch_size=4, shuffle=True)
+
 
 
 
@@ -221,17 +243,20 @@ if __name__ == "__main__":
     # }
 
     # wandb.init(project='unet-seg', config=cfg)
-
+    # 实例化你的自定义变换类
+    custom_transforms = RandomTransforms()
     train_set_path = '/scratch/xz3645/test/dl/Dataset_Student/train/video_' #Change this to your train set path
     val_set_path = '/scratch/xz3645/test/dl/Dataset_Student/val/video_' #Change this to your validation path
 
     train_data_dir = [f"{train_set_path}{i:05d}" for i in range(0, 1000)]
-    train_dataset = SegmentationDataSet(train_data_dir, None)
-    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=True)
+    # 使用数据增强的训练集
+    train_dataset = SegmentationDataSet(train_data_dir, transform=custom_transforms)
+    train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True)
     
     val_data_dir = [f"{val_set_path}{i:05d}" for i in range(1000, 2000)]
-    val_dataset = SegmentationDataSet(val_data_dir, None)
-    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=4, shuffle=True)
+    # 未使用数据增强的验证集
+    val_dataset = SegmentationDataSet(val_data_dir, transform=None)
+    val_dataloader = DataLoader(val_dataset, batch_size=4, shuffle=True)
 
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
