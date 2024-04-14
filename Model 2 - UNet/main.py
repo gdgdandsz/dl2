@@ -18,40 +18,28 @@ from torchvision import transforms
 from torchvision.transforms import functional as TF
 import random
 
-class RandomTransforms:
+from torchvision import transforms
+import torchvision.transforms.functional as TF
+import random
+
+class RandomGeometricTransforms:
     """
-    Apply the same random transforms to both image and mask.
+    Apply geometric transformations to the image and mask.
     """
     def __init__(self):
-        self.transforms = transforms.Compose([
-            transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomRotation(30),
-        ])
+        self.rotation_degrees = 30
+        self.flip_probability = 0.5
 
     def __call__(self, image, mask):
-        # Convert PIL Image to tensor for transformations
-        image = TF.to_tensor(image)
-        mask = TF.to_tensor(mask)
-
-        # Apply random transforms
-        angle = random.uniform(-30, 30)
+        # Apply random rotation
+        angle = random.uniform(-self.rotation_degrees, self.rotation_degrees)
         image = TF.rotate(image, angle)
-        mask = TF.rotate(mask, angle, fill=0)
+        mask = TF.rotate(mask, angle, fill=0)  # Assuming mask is a single-channel image, specify the fill value
 
-        if random.random() > 0.5:
+        # Apply random horizontal flip
+        if random.random() > self.flip_probability:
             image = TF.hflip(image)
             mask = TF.hflip(mask)
-
-        # Color jitter
-        image = TF.adjust_brightness(image, brightness_factor=random.uniform(0.7, 1.3))
-        image = TF.adjust_contrast(image, contrast_factor=random.uniform(0.7, 1.3))
-        image = TF.adjust_saturation(image, saturation_factor=random.uniform(0.7, 1.3))
-        image = TF.adjust_hue(image, hue_factor=random.uniform(-0.1, 0.1))
-
-        # Convert back to PIL Image
-        image = TF.to_pil_image(image)
-        mask = TF.to_pil_image(mask.squeeze(0))  # Assuming mask has a single channel
 
         return image, mask
 
