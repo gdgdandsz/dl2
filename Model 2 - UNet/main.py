@@ -47,7 +47,7 @@ class SegmentationDataSet(Dataset):
         mask = self.to_tensor(mask)
 
         if self.transform:
-            img, mask = self.transform(img, mask)  # Make sure the transform can handle tensors
+            img, mask = self.transform(img, mask)  # Make sure the transform can handle tens
 
         return img, mask
 
