@@ -56,12 +56,19 @@ class RandomTransforms:
         return image, mask
 
 
+from torchvision import transforms
+
 class SegmentationDataSet(Dataset):
     def __init__(self, video_dir, transform=None, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
-        self.transform = RandomTransforms()  # 使用数据增强
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),  # 将 PIL 图像转换为张量
+            # 这里可以加入其他数据增强的转换
+            transforms.RandomHorizontalFlip(),
+            transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1)
+        ])
+        self.dummy_image = torch.zeros((3,) + dummy_image_shape)  # 直接创建张量
+        self.dummy_mask = torch.zeros(dummy_mask_shape, dtype=torch.long)  # 掩码通常为长整型
         self.images, self.masks = [], []
-        self.dummy_image = np.zeros(dummy_image_shape, dtype=np.uint8)
-        self.dummy_mask = np.zeros(dummy_mask_shape, dtype=np.uint8)
         for i in video_dir:
             imgs = os.listdir(i)
             self.images.extend([i + '/' + img for img in imgs if not img.startswith('mask')])
@@ -73,22 +80,13 @@ class SegmentationDataSet(Dataset):
         try:
             img_path = self.images[index]
             img = Image.open(img_path).convert('RGB')
-            x = img_path.split('/')
-            image_name = x[-1]
-            mask_index = int(image_name.split("_")[1].split(".")[0])
-            video_folder = '/'.join(x[:-1])
-            mask_path = os.path.join(video_folder, 'mask.npy')
-            mask = np.load(mask_path)
-
-            if mask_index >= mask.shape[0]:
-                print(f"Requested index {mask_index} exceeds mask dimensions {mask.shape[0]}, using last available index.")
-                mask_index = mask.shape[0] - 1
-
-            mask = mask[mask_index, :, :]
-            mask = Image.fromarray(mask)
+            mask_index = int(img_path.split('_')[-2])
+            mask_path = '/'.join(img_path.split('/')[:-1]) + f'/mask_{mask_index:05d}.npy'
+            mask = Image.fromarray(np.load(mask_path))
 
             if self.transform:
-                img, mask = self.transform(img, mask)
+                img = self.transform(img)
+                mask = self.transform(mask)
 
             return img, mask
         except (IndexError, FileNotFoundError) as e:
