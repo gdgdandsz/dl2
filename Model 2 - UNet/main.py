@@ -48,7 +48,7 @@ class SegmentationDataSet(Dataset):
         img = Image.open(img_path).convert('RGB')
         
         # 从文件名中提取掩码索引
-        mask_index = int(os.path.basename(img_path).split('_')[1].split('.')[0])  # 更正了提取掩码索引的逻辑
+        mask_index = int(os.path.basename(img_path).split('_')[1].split('.')[0])  # 更正了提取掩码索引的逻辑测试
         video_folder = os.path.dirname(img_path)
         mask_path = os.path.join(video_folder, 'mask.npy')
 
