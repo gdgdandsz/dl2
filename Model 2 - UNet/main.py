@@ -22,28 +22,6 @@ from torchvision import transforms
 import torchvision.transforms.functional as TF
 import random
 
-class RandomGeometricTransforms:
-    """
-    Apply geometric transformations to the image and mask.
-    """
-    def __init__(self):
-        self.rotation_degrees = 30
-        self.flip_probability = 0.5
-
-    def __call__(self, image, mask):
-        # Apply random rotation
-        angle = random.uniform(-self.rotation_degrees, self.rotation_degrees)
-        image = TF.rotate(image, angle)
-        mask = TF.rotate(mask, angle, fill=0)  # Assuming mask is a single-channel image, specify the fill value
-
-        # Apply random horizontal flip
-        if random.random() > self.flip_probability:
-            image = TF.hflip(image)
-            mask = TF.hflip(mask)
-
-        return image, mask
-
-
 import os
 import torch
 import numpy as np
@@ -53,7 +31,8 @@ import torchvision.transforms.functional as TF
 import random
 
 class SegmentationDataSet(Dataset):
-    def __init__(self, video_dir, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
+    def __init__(self, video_dir, transform=None, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
+        self.transform = transform  # 接收传入的transform
         self.images, self.masks = [], []
         self.dummy_image = torch.zeros((3,) + dummy_image_shape)  # 直接创建张量
         self.dummy_mask = torch.zeros(dummy_mask_shape, dtype=torch.long)  # 掩码通常为长整型
@@ -76,26 +55,30 @@ class SegmentationDataSet(Dataset):
         try:
             mask = Image.fromarray(np.load(mask_path))
         except IndexError:
-            # Handle the case where mask index is out of bounds
+            # 如果索引超出范围，使用数组的第一个元素作为掩码
             mask = Image.fromarray(np.load(mask_path)[0])
 
-        # Apply transformations
-        img, mask = self.apply_transforms(img, mask)
-
-        return img, mask
-
-    def apply_transforms(self, img, mask):
-        # Apply random rotation
-        angle = random.uniform(-30, 30)
-        img = TF.rotate(img, angle)
-        mask = TF.rotate(mask, angle, fill=0)
-
-        # Apply random horizontal flip
-        if random.random() > 0.5:
-            img = TF.hflip(img)
-            mask = TF.hflip(mask)
+        if self.transform:
+            img, mask = self.transform(img, mask)
 
         return TF.to_tensor(img), TF.to_tensor(mask)
+
+# Transform class example
+class RandomGeometricTransforms:
+    def __init__(self):
+        pass
+
+    def __call__(self, image, mask):
+        angle = random.uniform(-30, 30)
+        image = TF.rotate(image, angle)
+        mask = TF.rotate(mask, angle, fill=0)
+
+        if random.random() > 0.5:
+            image = TF.hflip(image)
+            mask = TF.hflip(mask)
+
+        return image, mask
+
 
 # Example usage:
 # video_dirs = ['/path/to/videos']
