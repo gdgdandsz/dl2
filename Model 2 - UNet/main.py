@@ -39,7 +39,7 @@ class SegmentationDataSet(Dataset):
         x = x[:-1]
         mask_path = '/'.join(x)
         mask = np.load(mask_path + '/mask.npy')
-        mask = masks[min(j, len(masks) - 1)]  # Use the last available mask if j is out of bounds
+        mask = mask[mask_index, :, :]
         if self.transforms is not None:
             aug = self.transforms(image=img, mask=mask)
             img = aug['image']
