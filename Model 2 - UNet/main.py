@@ -10,34 +10,42 @@ from tqdm import tqdm
 #import wandb
 
 
-class SegmentationDataSet(Dataset):
+from PIL import Image
+import numpy as np
+import os
+from torch.utils.data import Dataset
 
+class SegmentationDataSet(Dataset):
     def __init__(self, video_dir, transform=None):
-        self.transforms = transform
+        self.transform = transform
         self.images, self.masks = [], []
         for i in video_dir:
             imgs = os.listdir(i)
-            self.images.extend([i + '/' + img for img in imgs if not img.startswith(
-                'mask')])  # /content/gdrive/MyDrive/Dataset_Studentnew/Dataset_Student/train/video_
-        # print(self.images[1000])
+            self.images.extend([os.path.join(i, img) for img in imgs if not img.startswith('mask')])
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, index):
-        img = np.array(Image.open(self.images[index]))
-        x = self.images[index].split('/')
-        image_name = x[-1]
-        mask_index = int(image_name.split("_")[1].split(".")[0])
-        x = x[:-1]
-        mask_path = '/'.join(x)
-        mask = np.load(mask_path + '/mask.npy')
-        mask = mask[mask_index, :, :]
+        img_path = self.images[index]
+        img = Image.open(img_path).convert('RGB')
 
-        if self.transforms is not None:
-            aug = self.transforms(image=img, mask=mask)
-            img = aug['image']
-            mask = aug['mask']
+        # Assuming mask filenames are numbered and correspond to the image index
+        mask_index = int(img_path.split('_')[-1].split('.')[0])
+        mask_dir = os.path.dirname(img_path)
+        mask_path = os.path.join(mask_dir, 'mask.npy')
+        
+        mask = np.load(mask_path)
+        if mask_index >= mask.shape[0]:
+            # If the mask index is out of bounds, use the last mask
+            mask = mask[-1]
+        else:
+            mask = mask[mask_index]
+
+        mask = Image.fromarray(mask.astype(np.uint8))
+
+        if self.transform:
+            img, mask = self.transform(img, mask)
 
         return img, mask
 
