@@ -228,7 +228,7 @@ if __name__ == "__main__":
 
     # hyperparameters
 
-    LEARNING_RATE = 1e-4
+    LEARNING_RATE = 1e-5
     num_epochs = 40
     max_patience = 3
     epochs_no_improve = 0
@@ -241,7 +241,7 @@ if __name__ == "__main__":
     loss_fn = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-8)
     scaler = torch.cuda.amp.GradScaler()
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
 
     # Train loop
     for epoch in range(num_epochs):
