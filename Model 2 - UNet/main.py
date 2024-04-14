@@ -10,76 +10,36 @@ from tqdm import tqdm
 #import wandb
 
 
-from PIL import Image
-import numpy as np
-import torch
-
-from torchvision import transforms
-from torchvision.transforms import functional as TF
-import random
-
-from torchvision import transforms
-import torchvision.transforms.functional as TF
-import random
-
-import os
-import torch
-import numpy as np
-from torch.utils.data import Dataset
-from PIL import Image
-import torchvision.transforms.functional as TF
-import random
-
-from torchvision.transforms import ToTensor
-
 class SegmentationDataSet(Dataset):
-    def __init__(self, video_dir, transform=None, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
-        self.transform = transform
+
+    def __init__(self, video_dir, transform=None):
+        self.transforms = transform
         self.images, self.masks = [], []
         for i in video_dir:
             imgs = os.listdir(i)
-            self.images.extend([os.path.join(i, img) for img in imgs if not img.startswith('mask')])
+            self.images.extend([i + '/' + img for img in imgs if not img.startswith(
+                'mask')])  # /content/gdrive/MyDrive/Dataset_Studentnew/Dataset_Student/train/video_
+        # print(self.images[1000])
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, index):
-        img_path = self.images[index]
-        img = Image.open(img_path).convert('RGB')
-        
-        mask_index = int(img_path.split('_')[-1].split('.')[0])
-        video_folder = os.path.dirname(img_path)
-        mask_path = os.path.join(video_folder, 'mask.npy')
-        
-        try:
-            mask = np.load(mask_path)[mask_index]
-        except IndexError:
-            mask = np.load(mask_path)[0]  # Handling the case where the index is out of bounds
-        
-        mask = Image.fromarray(mask.astype(np.uint8))
+        img = np.array(Image.open(self.images[index]))
+        x = self.images[index].split('/')
+        image_name = x[-1]
+        mask_index = int(image_name.split("_")[1].split(".")[0])
+        x = x[:-1]
+        mask_path = '/'.join(x)
+        mask = np.load(mask_path + '/mask.npy')
+        mask = mask[mask_index, :, :]
 
-        if self.transform:
-            img, mask = self.transform(img, mask)
-        else:
-            img, mask = ToTensor()(img), ToTensor()(mask)
+        if self.transforms is not None:
+            aug = self.transforms(image=img, mask=mask)
+            img = aug['image']
+            mask = aug['mask']
 
         return img, mask
-
-# Example of transform class that would handle rotation and flipping
-class RandomGeometricTransforms:
-    def __call__(self, img, mask):
-        # Apply random transformations here
-        # Rotate, flip, etc., ensuring you apply the same transform to both img and mask
-        transform = transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomRotation(30),
-            ToTensor()
-        ])
-        return transform(img), transform(mask)
-
-
-
-
 
 
 class encoding_block(nn.Module):
@@ -219,21 +179,17 @@ if __name__ == "__main__":
     # }
 
     # wandb.init(project='unet-seg', config=cfg)
-    # 实例化你的自定义变换类
-    custom_transforms = RandomGeometricTransforms()
+
     train_set_path = '/scratch/xz3645/test/dl/Dataset_Student/train/video_' #Change this to your train set path
     val_set_path = '/scratch/xz3645/test/dl/Dataset_Student/val/video_' #Change this to your validation path
 
     train_data_dir = [f"{train_set_path}{i:05d}" for i in range(0, 1000)]
-    # 使用数据增强的训练集
-    train_dataset = SegmentationDataSet(train_data_dir, transform=custom_transforms)
-    train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-    
-    val_data_dir = [f"{val_set_path}{i:05d}" for i in range(1000, 2000)]
-    # 未使用数据增强的验证集
-    val_dataset = SegmentationDataSet(val_data_dir, transform=None)
-    val_dataloader = DataLoader(val_dataset, batch_size=4, shuffle=True)
+    train_dataset = SegmentationDataSet(train_data_dir, None)
+    train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=True)
 
+    val_data_dir = [f"{val_set_path}{i:05d}" for i in range(1000, 2000)]
+    val_dataset = SegmentationDataSet(val_data_dir, None)
+    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=4, shuffle=True)
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -243,20 +199,18 @@ if __name__ == "__main__":
 
     # hyperparameters
 
-    LEARNING_RATE = 1e-5
+    LEARNING_RATE = 1e-4
     num_epochs = 40
     max_patience = 3
     epochs_no_improve = 0
     early_stop = False
     SMOOTH = 1e-6
-    import torch.optim as optim
-    from torch.optim.lr_scheduler import ReduceLROnPlateau
+
     # loss criterion, optimizer
 
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-7)
+    optimizer = Adam(model.parameters(), lr=LEARNING_RATE，weight_decay=1e-8)
     scaler = torch.cuda.amp.GradScaler()
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3)
 
     # Train loop
     for epoch in range(num_epochs):
@@ -320,7 +274,6 @@ if __name__ == "__main__":
 
             mean_thresholded_iou = sum(ious) / len(ious)
             avg_val_loss = sum(val_losses) / len(val_losses)
-            scheduler.step(avg_val_loss)
             print(f"Epoch: {epoch}, avg IoU: {mean_thresholded_iou}, avg val loss: {avg_val_loss}")
 
         if avg_val_loss < last_val_loss:
