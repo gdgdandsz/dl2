@@ -14,16 +14,54 @@ from PIL import Image
 import numpy as np
 import torch
 
-from PIL import Image
-import numpy as np
-import torch
+from torchvision import transforms
+from torchvision.transforms import functional as TF
+import random
+
+class RandomTransforms:
+    """
+    Apply the same random transforms to both image and mask.
+    """
+    def __init__(self):
+        self.transforms = transforms.Compose([
+            transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomRotation(30),
+        ])
+
+    def __call__(self, image, mask):
+        # Convert PIL Image to tensor for transformations
+        image = TF.to_tensor(image)
+        mask = TF.to_tensor(mask)
+
+        # Apply random transforms
+        angle = random.uniform(-30, 30)
+        image = TF.rotate(image, angle)
+        mask = TF.rotate(mask, angle, fill=0)
+
+        if random.random() > 0.5:
+            image = TF.hflip(image)
+            mask = TF.hflip(mask)
+
+        # Color jitter
+        image = TF.adjust_brightness(image, brightness_factor=random.uniform(0.7, 1.3))
+        image = TF.adjust_contrast(image, contrast_factor=random.uniform(0.7, 1.3))
+        image = TF.adjust_saturation(image, saturation_factor=random.uniform(0.7, 1.3))
+        image = TF.adjust_hue(image, hue_factor=random.uniform(-0.1, 0.1))
+
+        # Convert back to PIL Image
+        image = TF.to_pil_image(image)
+        mask = TF.to_pil_image(mask.squeeze(0))  # Assuming mask has a single channel
+
+        return image, mask
+
 
 class SegmentationDataSet(Dataset):
     def __init__(self, video_dir, transform=None, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
-        self.transforms = transform
+        self.transform = RandomTransforms()  # 使用数据增强
         self.images, self.masks = [], []
-        self.dummy_image = np.zeros(dummy_image_shape, dtype=np.uint8)  # Example dummy image
-        self.dummy_mask = np.zeros(dummy_mask_shape, dtype=np.uint8)   # Example dummy mask
+        self.dummy_image = np.zeros(dummy_image_shape, dtype=np.uint8)
+        self.dummy_mask = np.zeros(dummy_mask_shape, dtype=np.uint8)
         for i in video_dir:
             imgs = os.listdir(i)
             self.images.extend([i + '/' + img for img in imgs if not img.startswith('mask')])
@@ -34,38 +72,28 @@ class SegmentationDataSet(Dataset):
     def __getitem__(self, index):
         try:
             img_path = self.images[index]
-            img = np.array(Image.open(img_path))
+            img = Image.open(img_path).convert('RGB')
             x = img_path.split('/')
             image_name = x[-1]
             mask_index = int(image_name.split("_")[1].split(".")[0])
             video_folder = '/'.join(x[:-1])
             mask_path = os.path.join(video_folder, 'mask.npy')
             mask = np.load(mask_path)
-            
+
             if mask_index >= mask.shape[0]:
-                # If requested index exceeds mask dimensions, use the last available frame
                 print(f"Requested index {mask_index} exceeds mask dimensions {mask.shape[0]}, using last available index.")
                 mask_index = mask.shape[0] - 1
 
             mask = mask[mask_index, :, :]
+            mask = Image.fromarray(mask)
 
-            if self.transforms is not None:
-                aug = self.transforms(image=img, mask=mask)
-                img = aug['image']
-                mask = aug['mask']
+            if self.transform:
+                img, mask = self.transform(img, mask)
 
             return img, mask
         except (IndexError, FileNotFoundError) as e:
             print(f"Returning dummy data for index {index} - {str(e)}")
-            # Return dummy data that matches the shape of your inputs and targets
-            dummy_img = self.dummy_image.copy()
-            dummy_mask = self.dummy_mask.copy()
-            if self.transforms is not None:
-                aug = self.transforms(image=dummy_img, mask=dummy_mask)
-                dummy_img = aug['image']
-                dummy_mask = aug['mask']
-            return dummy_img, dummy_mask
-
+            return self.dummy_image, self.dummy_mask
 
 
 
