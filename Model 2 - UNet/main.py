@@ -15,13 +15,16 @@ import numpy as np
 import os
 from torch.utils.data import Dataset
 
+from torchvision.transforms import ToTensor
+
 class SegmentationDataSet(Dataset):
-    def __init__(self, video_dir, transform=None):
-        self.transform = transform
+    def __init__(self, video_dir, transform=None, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
+        self.transform = transform  # Accept an optional transform to be applied
         self.images, self.masks = [], []
         for i in video_dir:
             imgs = os.listdir(i)
             self.images.extend([os.path.join(i, img) for img in imgs if not img.startswith('mask')])
+        self.to_tensor = ToTensor()  # Add this line
 
     def __len__(self):
         return len(self.images)
@@ -29,25 +32,25 @@ class SegmentationDataSet(Dataset):
     def __getitem__(self, index):
         img_path = self.images[index]
         img = Image.open(img_path).convert('RGB')
-
-        # Assuming mask filenames are numbered and correspond to the image index
         mask_index = int(img_path.split('_')[-1].split('.')[0])
-        mask_dir = os.path.dirname(img_path)
-        mask_path = os.path.join(mask_dir, 'mask.npy')
-        
-        mask = np.load(mask_path)
-        if mask_index >= mask.shape[0]:
-            # If the mask index is out of bounds, use the last mask
-            mask = mask[-1]
-        else:
-            mask = mask[mask_index]
+        mask_path = os.path.join(os.path.dirname(img_path), 'mask.npy')
 
+        try:
+            mask = np.load(mask_path)[mask_index]
+        except IndexError:
+            mask = np.load(mask_path)[-1]  # Use the last mask if the index is out of range
+        
         mask = Image.fromarray(mask.astype(np.uint8))
 
+        # Convert both the image and mask to tensors
+        img = self.to_tensor(img)
+        mask = self.to_tensor(mask)
+
         if self.transform:
-            img, mask = self.transform(img, mask)
+            img, mask = self.transform(img, mask)  # Make sure the transform can handle tensors
 
         return img, mask
+
 
 
 class encoding_block(nn.Module):
