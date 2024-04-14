@@ -210,6 +210,11 @@ if __name__ == "__main__":
 
     loss_fn = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=LEARNING_RATE，weight_decay=1e-8)
+    # 初始化调度器
+    import torch.optim as optim
+    from torch.optim.lr_scheduler import ReduceLROnPlateau
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
+
     scaler = torch.cuda.amp.GradScaler()
 
     # Train loop
@@ -275,6 +280,7 @@ if __name__ == "__main__":
             mean_thresholded_iou = sum(ious) / len(ious)
             avg_val_loss = sum(val_losses) / len(val_losses)
             print(f"Epoch: {epoch}, avg IoU: {mean_thresholded_iou}, avg val loss: {avg_val_loss}")
+            scheduler.step(avg_val_loss)
 
         if avg_val_loss < last_val_loss:
             best_model = model
