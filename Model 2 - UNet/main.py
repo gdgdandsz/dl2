@@ -32,7 +32,7 @@ import random
 
 class SegmentationDataSet(Dataset):
     def __init__(self, video_dir, transform=None, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
-        self.transform = transform  # 接收传入的transform
+        self.transform = transform
         self.images, self.masks = [], []
         self.dummy_image = torch.zeros((3,) + dummy_image_shape)  # 直接创建张量
         self.dummy_mask = torch.zeros(dummy_mask_shape, dtype=torch.long)  # 掩码通常为长整型
@@ -47,13 +47,13 @@ class SegmentationDataSet(Dataset):
         img_path = self.images[index]
         img = Image.open(img_path).convert('RGB')
         
-        # Extract mask index and path
-        mask_index = int(img_path.split('_')[-2])
-        video_folder = '/'.join(img_path.split('/')[:-1])
-        mask_path = os.path.join(video_folder, f'mask_{mask_index:05d}.npy')
-        
+        # 从文件名中提取掩码索引
+        mask_index = int(os.path.basename(img_path).split('_')[1].split('.')[0])  # 更正了提取掩码索引的逻辑
+        video_folder = os.path.dirname(img_path)
+        mask_path = os.path.join(video_folder, 'mask.npy')
+
         try:
-            mask = Image.fromarray(np.load(mask_path))
+            mask = Image.fromarray(np.load(mask_path)[mask_index])
         except IndexError:
             # 如果索引超出范围，使用数组的第一个元素作为掩码
             mask = Image.fromarray(np.load(mask_path)[0])
