@@ -30,12 +30,12 @@ from PIL import Image
 import torchvision.transforms.functional as TF
 import random
 
+from torchvision.transforms import ToTensor
+
 class SegmentationDataSet(Dataset):
     def __init__(self, video_dir, transform=None, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
         self.transform = transform
         self.images, self.masks = [], []
-        self.dummy_image = torch.zeros((3,) + dummy_image_shape)  # 直接创建张量
-        self.dummy_mask = torch.zeros(dummy_mask_shape, dtype=torch.long)  # 掩码通常为长整型
         for i in video_dir:
             imgs = os.listdir(i)
             self.images.extend([os.path.join(i, img) for img in imgs if not img.startswith('mask')])
@@ -47,43 +47,36 @@ class SegmentationDataSet(Dataset):
         img_path = self.images[index]
         img = Image.open(img_path).convert('RGB')
         
-        # 从文件名中提取掩码索引
-        mask_index = int(os.path.basename(img_path).split('_')[1].split('.')[0])  # 更正了提取掩码索引的逻辑测试
+        mask_index = int(img_path.split('_')[-1].split('.')[0])
         video_folder = os.path.dirname(img_path)
         mask_path = os.path.join(video_folder, 'mask.npy')
-
+        
         try:
-            mask = Image.fromarray(np.load(mask_path)[mask_index])
+            mask = np.load(mask_path)[mask_index]
         except IndexError:
-            # 如果索引超出范围，使用数组的第一个元素作为掩码
-            mask = Image.fromarray(np.load(mask_path)[0])
+            mask = np.load(mask_path)[0]  # Handling the case where the index is out of bounds
+        
+        mask = Image.fromarray(mask.astype(np.uint8))
 
         if self.transform:
             img, mask = self.transform(img, mask)
+        else:
+            img, mask = ToTensor()(img), ToTensor()(mask)
 
-        return TF.to_tensor(img), TF.to_tensor(mask)
+        return img, mask
 
-# Transform class example
+# Example of transform class that would handle rotation and flipping
 class RandomGeometricTransforms:
-    def __init__(self):
-        pass
+    def __call__(self, img, mask):
+        # Apply random transformations here
+        # Rotate, flip, etc., ensuring you apply the same transform to both img and mask
+        transform = transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(30),
+            ToTensor()
+        ])
+        return transform(img), transform(mask)
 
-    def __call__(self, image, mask):
-        angle = random.uniform(-30, 30)
-        image = TF.rotate(image, angle)
-        mask = TF.rotate(mask, angle, fill=0)
-
-        if random.random() > 0.5:
-            image = TF.hflip(image)
-            mask = TF.hflip(mask)
-
-        return image, mask
-
-
-# Example usage:
-# video_dirs = ['/path/to/videos']
-# dataset = SegmentationDataSet(video_dirs)
-# loader = DataLoader(dataset, batch_size=4, shuffle=True)
 
 
 
