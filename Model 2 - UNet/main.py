@@ -145,7 +145,7 @@ def check_accuracy(loader, model):
 
             # print(dice_score)
             # print(x.cpu()[0])
-            # break
+            
 
     # mean_thresholded_iou = sum(ious)/len(ious)
 
