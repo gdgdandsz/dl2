@@ -18,39 +18,35 @@ from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
 
 class SegmentationDataSet(Dataset):
-    def __init__(self, video_dir, transform=None, dummy_image_shape=(160, 240, 3), dummy_mask_shape=(160, 240)):
-        self.transform = transform  # Accept an optional transform to be applied
+
+    def __init__(self, video_dir, transform=None):
+        self.transforms = transform
         self.images, self.masks = [], []
         for i in video_dir:
             imgs = os.listdir(i)
-            self.images.extend([os.path.join(i, img) for img in imgs if not img.startswith('mask')])
-        self.to_tensor = ToTensor()  # Add this line
+            self.images.extend([i + '/' + img for img in imgs if not img.startswith(
+                'mask')])  # /content/gdrive/MyDrive/Dataset_Studentnew/Dataset_Student/train/video_
+        # print(self.images[1000])
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, index):
-        img_path = self.images[index]
-        img = Image.open(img_path).convert('RGB')
-        mask_index = int(img_path.split('_')[-1].split('.')[0])
-        mask_path = os.path.join(os.path.dirname(img_path), 'mask.npy')
+        img = np.array(Image.open(self.images[index]))
+        x = self.images[index].split('/')
+        image_name = x[-1]
+        mask_index = int(image_name.split("_")[1].split(".")[0])
+        x = x[:-1]
+        mask_path = '/'.join(x)
+        mask = np.load(mask_path + '/mask.npy')
+        mask = mask[mask_index, :, :]
 
-        try:
-            mask = np.load(mask_path)[mask_index]
-        except IndexError:
-            mask = np.load(mask_path)[-1]  # Use the last mask if the index is out of range
-        
-        mask = Image.fromarray(mask.astype(np.uint8))
-
-        # Convert both the image and mask to tensors
-        img = self.to_tensor(img)
-        mask = self.to_tensor(mask)
-
-        if self.transform:
-            img, mask = self.transform(img, mask)  # Make sure the transform can handle tens
+        if self.transforms is not None:
+            aug = self.transforms(image=img, mask=mask)
+            img = aug['image']
+            mask = aug['mask']
 
         return img, mask
-
 
 
 class encoding_block(nn.Module):
