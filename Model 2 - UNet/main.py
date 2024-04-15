@@ -289,7 +289,7 @@ if __name__ == "__main__":
             jaccard = torchmetrics.JaccardIndex(num_classes=49, task="multiclass").to(DEVICE)
             with torch.no_grad():
                 for images, masks in tqdm(val_dataloader):
-                    images, masks = images.to(device), masks.to(device)
+                    images, masks = images.to(DEVICE), masks.to(DEVICE)
                     outputs = model(images)
                     preds = torch.argmax(outputs, dim=1)
                     jaccard.update(preds, masks)
