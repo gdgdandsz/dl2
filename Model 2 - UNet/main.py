@@ -286,7 +286,7 @@ if __name__ == "__main__":
                 thresholded_iou = batch_iou_pytorch(SMOOTH, preds_arg, y)
                 ious.append(thresholded_iou)
             model.eval()
-            jaccard = torchmetrics.JaccardIndex(num_classes=49, task="multiclass").to(device)
+            jaccard = torchmetrics.JaccardIndex(num_classes=49, task="multiclass").to(DEVICE)
             with torch.no_grad():
                 for images, masks in tqdm(val_loader):
                     images, masks = images.to(device), masks.to(device)
