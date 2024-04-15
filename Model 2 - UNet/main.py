@@ -199,11 +199,11 @@ if __name__ == "__main__":
     val_set_path = '/scratch/xz3645/test/dl/Dataset_Student/val/video_' #Change this to your validation path
 
     train_data_dir = [f"{train_set_path}{i:05d}" for i in range(0, 1000)]
-    train_dataset = SegmentationDataSet(train_data_dir, transform)
+    train_dataset = SegmentationDataSet(train_data_dir)#, transform)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=True)
 
     val_data_dir = [f"{val_set_path}{i:05d}" for i in range(1000, 2000)]
-    val_dataset = SegmentationDataSet(val_data_dir, transform)
+    val_dataset = SegmentationDataSet(val_data_dir)#, transform)
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=4, shuffle=True)
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
