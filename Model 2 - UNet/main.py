@@ -222,7 +222,7 @@ if __name__ == "__main__":
     # 初始
     import torch.optim as optim
     from torch.optim.lr_scheduler import ReduceLROnPlateau
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3, verbose=True)
 
     scaler = torch.cuda.amp.GradScaler()
 
@@ -254,7 +254,7 @@ if __name__ == "__main__":
         ious = []
         last_iou = 0
         softmax = nn.Softmax(dim=1)
-
+        best_iou = 0.0 
         with torch.no_grad():
             for i, (x, y) in enumerate(tqdm(val_dataloader)):
                 x = x.permute(0, 3, 1, 2).type(torch.cuda.FloatTensor).to(DEVICE)
@@ -285,13 +285,23 @@ if __name__ == "__main__":
 
                 thresholded_iou = batch_iou_pytorch(SMOOTH, preds_arg, y)
                 ious.append(thresholded_iou)
-
+            model.eval()
+            jaccard = torchmetrics.JaccardIndex(num_classes=49).to(device)
+            with torch.no_grad():
+                for images, masks in tqdm(val_loader):
+                    images, masks = images.to(device), masks.to(device)
+                    outputs = model(images)
+                    preds = torch.argmax(outputs, dim=1)
+                    jaccard.update(preds, masks)
+            
+            iou_score = jaccard.compute()
+            print(f"Validation IoU: {iou_score}")
             mean_thresholded_iou = sum(ious) / len(ious)
             avg_val_loss = sum(val_losses) / len(val_losses)
             print(f"Epoch: {epoch}, avg IoU: {mean_thresholded_iou}, avg val loss: {avg_val_loss}")
-            scheduler.step(avg_val_loss)
+            scheduler.step(iou_score)
 
-        if avg_val_loss < last_val_loss:
+        if iou_score > best_iou:
             best_model = model
             torch.save(best_model, 'unet.pt')
             last_val_loss = avg_val_loss
