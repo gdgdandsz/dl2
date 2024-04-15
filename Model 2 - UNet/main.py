@@ -43,10 +43,11 @@ class SegmentationDataSet(Dataset):
             mask = mask[mask_index, :, :]
         except IndexError:  # Index is out of the bounds of the array
             mask = mask[-1, :, :]  # Use the last mask if the index is out of range
-        if self.transforms is not None:
-            aug = self.transforms(image=img, mask=mask)
-            img = aug['image']
-            mask = aug['mask']
+        if self.transform:
+            img = self.transform(img)  # 应用transform
+
+        mask = torch.tensor(mask, dtype=torch.long)  # 确保掩码也转换为tensor
+
 
         return img, mask
 
