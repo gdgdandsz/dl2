@@ -142,15 +142,15 @@ def check_accuracy(loader, model):
             num_correct += (preds == y).sum()
             num_pixels += torch.numel(preds)
 
-            # thresholded_iou = batch_iou_pytorch(SMOOTH, preds, y)
-            # ious.append(thresholded_iou)
+            thresholded_iou = batch_iou_pytorch(SMOOTH, preds, y)
+            ious.append(thresholded_iou)
             dice_score += (2 * (preds * y).sum()) / ((preds + y).sum() + 1e-8)
 
-            # print(dice_score)
-            # print(x.cpu()[0])
+            print(dice_score)
+            print(x.cpu()[0])
             
 
-    # mean_thresholded_iou = sum(ious)/len(ious)
+    mean_thresholded_iou = sum(ious)/len(ious)
 
     y_preds_concat = torch.cat(y_preds_list, dim=0)
     y_trues_concat = torch.cat(y_trues_list, dim=0)
@@ -208,7 +208,7 @@ if __name__ == "__main__":
 
     # hyperparameters
 
-    LEARNING_RATE = 1e-4
+    LEARNING_RATE = 1e-5
     num_epochs = 40
     max_patience = 3
     epochs_no_improve = 0
