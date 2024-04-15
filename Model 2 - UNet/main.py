@@ -16,7 +16,7 @@ import os
 from torch.utils.data import Dataset
 
 from torchvision.transforms import ToTensor
-
+from torchvision import transforms
 class SegmentationDataSet(Dataset):
 
     def __init__(self, video_dir, transform=None):
