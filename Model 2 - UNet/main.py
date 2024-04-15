@@ -20,7 +20,7 @@ from torchvision import transforms
 class SegmentationDataSet(Dataset):
 
     def __init__(self, video_dir, transform=None):
-        self.transforms = transform
+        self.transform = transform
         self.images, self.masks = [], []
         for i in video_dir:
             imgs = os.listdir(i)
