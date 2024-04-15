@@ -208,7 +208,7 @@ if __name__ == "__main__":
 
     # hyperparameters
 
-    LEARNING_RATE = 1e-5
+    LEARNING_RATE = 5e-6
     num_epochs = 40
     max_patience = 3
     epochs_no_improve = 0
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     # 初始
     import torch.optim as optim
     from torch.optim.lr_scheduler import ReduceLROnPlateau
-    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3)
 
     scaler = torch.cuda.amp.GradScaler()
 
