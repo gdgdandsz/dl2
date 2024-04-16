@@ -295,7 +295,7 @@ if __name__ == "__main__":
             jaccard = torchmetrics.JaccardIndex(num_classes=49, task="multiclass").to(DEVICE)
             with torch.no_grad():
                 for images, masks in tqdm(val_dataloader):
-                    images = images.permute(0, 3, 1, 2).to(DEVICE)
+                    images = images.float().permute(0, 3, 1, 2).to(DEVICE)  # 确保图像是float类型并且维度正确
                     masks = masks.to(DEVICE)  # Send masks to devic
                     outputs = model(images)
                     preds = torch.argmax(outputs, dim=1)
@@ -303,9 +303,11 @@ if __name__ == "__main__":
             
             iou_score = jaccard.compute()
             print(f"Validation IoU: {iou_score}")
+            
             mean_thresholded_iou = sum(ious) / len(ious)
             avg_val_loss = sum(val_losses) / len(val_losses)
             print(f"Epoch: {epoch}, avg IoU: {mean_thresholded_iou}, avg val loss: {avg_val_loss}")
+            
             scheduler.step(iou_score)
 
         if iou_score > best_iou:
