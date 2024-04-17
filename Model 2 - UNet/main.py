@@ -214,7 +214,7 @@ if __name__ == "__main__":
 
     # hyperparameters
 
-    LEARNING_RATE = 5e-6
+    LEARNING_RATE = 1e-5
     num_epochs = 40
     max_patience = 3
     epochs_no_improve = 0
