@@ -50,6 +50,23 @@ def main_module():
     print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>  start <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     exp.train(args)
     print('>>>>>>>>>>>>>>>>>>>>>>>>>>>> testing <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+    def validate_model(model, loader, device):
+        model.eval()
+        total_loss = 0
+        criterion = torch.nn.MSELoss()  # 使用 MSE 作为损失函数
+        with torch.no_grad():
+            for data, target in loader:
+                data, target = data.to(device), target.to(device)
+                output = model(data)
+                loss = criterion(output, target)
+                total_loss += loss.item() * data.size(0)
+        
+        mse = total_loss / len(loader.dataset)
+        print(f"Test MSE: {mse}")
+        return mse
+
+    # 假设你已经有了数据加载器和模型
+    mse = validate_model(model, val_loader, device)
 
     wandb.log({"test_final_mse": mse})
 
