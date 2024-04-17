@@ -86,6 +86,22 @@ class Exp:
         fw = open(os.path.join(self.checkpoints_path, name + '.pkl'), 'wb')
         pickle.dump(state, fw)
 
+    def evaluate_iou(self):
+        """Evaluate the IoU using Jaccard Index on validation data."""
+        self.model.eval()
+        jaccard_metric = JaccardIndex(num_classes=49, task='multiclass').to(self.device)
+        
+        with torch.no_grad():
+            for batch_x, batch_y in tqdm(self.vali_loader):
+                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                preds = self.model(batch_x)
+                preds_classes = torch.argmax(preds, dim=1)
+                jaccard_metric.update(preds_classes, batch_y)
+
+        final_iou = jaccard_metric.compute()
+        print(f"Final IoU Score: {final_iou}")
+        print_log(f"Evaluated IoU on validation set: {final_iou}")
+    
     def prediction_eval(self,args):
 
         self.model.load_state_dict(torch.load(self.model1_path))
