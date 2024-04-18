@@ -180,20 +180,6 @@ def batch_iou_pytorch(SMOOTH, outputs: torch.Tensor, labels: torch.Tensor):
     return thresholded  # Or thresholded.mean() if you are interested in average across the batch
 
 
-import torch
-from torchvision import transforms
-from torch.utils.data import DataLoader
-from torch.optim import Adam
-import torch.nn as nn
-from model import unet_model
-from dataset import SegmentationDataSet
-from torchmetrics import JaccardIndex
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-import copy
-import optuna
-from tqdm import tqdm
-import numpy as np
-
 def objective(trial):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = unet_model().to(device)
