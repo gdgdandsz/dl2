@@ -185,7 +185,7 @@ def objective(trial):
     model = unet_model().to(device)
     optimizer = Adam(model.parameters(), lr=trial.suggest_loguniform('lr', 1e-5, 1e-3, 1e-4, 1e-2, 1e-1), weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
-    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3)
 
     batch_size = trial.suggest_categorical('batch_size', [4, 8, 16, 32, 64])
     train_dataset = SegmentationDataSet(train_data_dir)
