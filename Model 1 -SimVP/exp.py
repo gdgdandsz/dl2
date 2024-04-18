@@ -147,7 +147,7 @@ class Exp:
         self.model.load_state_dict(torch.load(best_model_path))
         return self.model
 
-    def vali(self, vali_loader, limit_percent=0.8):
+    def vali(self, vali_loader, limit_percent=1):
         self.model.eval()
         preds_lst, trues_lst, total_loss = [], [], []
         total_batches = int(len(vali_loader) * limit_percent)
