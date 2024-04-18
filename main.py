@@ -2,6 +2,7 @@ import os
 import torch
 import numpy as np
 import torchmetrics
+from torchmetrics import JaccardIndex
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 import torch.nn as nn
