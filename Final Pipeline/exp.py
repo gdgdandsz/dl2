@@ -86,7 +86,7 @@ class Exp:
         fw = open(os.path.join(self.checkpoints_path, name + '.pkl'), 'wb')
         pickle.dump(state, fw)
 
-    def evaluate_iou(self):
+    def evaluate_iou(self,args):
         """Evaluate the IoU using Jaccard Index on validation data."""
         self.model.eval()
         jaccard_metric = JaccardIndex(num_classes=49, task='multiclass').to(self.device)
@@ -99,7 +99,7 @@ class Exp:
                 jaccard_metric.update(preds_classes, batch_y)
 
         final_iou = jaccard_metric.compute()
-        print(f"Final IoU Score: {final_iou}")
+        #print(f"Final IoU Score: {final_iou}")
         print_log(f"Evaluated IoU on validation set: {final_iou}")
     
     def prediction_eval(self,args):
