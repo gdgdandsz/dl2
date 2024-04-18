@@ -214,7 +214,7 @@ if __name__ == "__main__":
 
     # hyperparameters
 
-    LEARNING_RATE = 1e-4
+    LEARNING_RATE = 5e-5
     num_epochs = 40
     max_patience = 3
     epochs_no_improve = 0
@@ -291,30 +291,32 @@ if __name__ == "__main__":
 
                 thresholded_iou = batch_iou_pytorch(SMOOTH, preds_arg, y)
                 ious.append(thresholded_iou)
-            model.eval()
-            jaccard = torchmetrics.JaccardIndex(num_classes=49, task="multiclass").to(DEVICE)
-            with torch.no_grad():
-                for images, masks in tqdm(val_dataloader):
-                    images = images.float().permute(0, 3, 1, 2).to(DEVICE)  # 确保图像是float类型并且维度正确
-                    masks = masks.to(DEVICE)  # Send masks to devic
-                    outputs = model(images)
-                    preds = torch.argmax(outputs, dim=1)
-                    jaccard.update(preds, masks)
+        model.eval()
+        jaccard = torchmetrics.JaccardIndex(num_classes=49, task="multiclass").to(DEVICE)
+        with torch.no_grad():
+            for images, masks in tqdm(val_dataloader):
+                images = images.float().permute(0, 3, 1, 2).to(DEVICE)  # 确保图像是float类型并且维度正确
+                masks = masks.to(DEVICE)  # Send masks to devic
+                outputs = model(images)
+                preds = torch.argmax(outputs, dim=1)
+                jaccard.update(preds, masks)
             
-            iou_score = jaccard.compute()
-            print(f"Validation IoU: {iou_score}")
+        iou_score = jaccard.compute()
+        print(f"Validation IoU: {iou_score}")
             
-            mean_thresholded_iou = sum(ious) / len(ious)
-            avg_val_loss = sum(val_losses) / len(val_losses)
-            print(f"Epoch: {epoch}, avg IoU: {mean_thresholded_iou}, avg val loss: {avg_val_loss}")
+        mean_thresholded_iou = sum(ious) / len(ious)
+        avg_val_loss = sum(val_losses) / len(val_losses)
+        print(f"Epoch: {epoch}, avg IoU: {mean_thresholded_iou}, avg val loss: {avg_val_loss}")
             
-            scheduler.step(iou_score)
+        scheduler.step(iou_score)
 
         if iou_score > best_iou:
             best_model = model
+            best_iou=iou_score
             torch.save(best_model, 'unet.pt')
             last_val_loss = avg_val_loss
             epochs_no_improve = 0
+            print('best_iou',best_iou)
         else:
             epochs_no_improve += 1
 
