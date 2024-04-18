@@ -231,7 +231,7 @@ if __name__ == "__main__":
     scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3)
 
     scaler = torch.cuda.amp.GradScaler()
-
+    best_iou = 0.0 
     # Train loop
     for epoch in range(num_epochs):
         loop = tqdm(train_dataloader)
@@ -260,7 +260,7 @@ if __name__ == "__main__":
         ious = []
         last_iou = 0
         softmax = nn.Softmax(dim=1)
-        best_iou = 0.0 
+        
         with torch.no_grad():
             for i, (x, y) in enumerate(tqdm(val_dataloader)):
                 x = x.permute(0, 3, 1, 2).type(torch.cuda.FloatTensor).to(DEVICE)
