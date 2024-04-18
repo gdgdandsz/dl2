@@ -316,7 +316,7 @@ if __name__ == "__main__":
             torch.save(best_model, 'unet.pt')
             last_val_loss = avg_val_loss
             epochs_no_improve = 0
-            print('best_iou',best_iou)
+            print('best_iou model saved',best_iou)
         else:
             epochs_no_improve += 1
 
