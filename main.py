@@ -18,40 +18,32 @@ from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
 from torchvision import transforms
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+# Define the dataset
 class SegmentationDataSet(Dataset):
-
     def __init__(self, video_dir, transform=None):
         self.transform = transform
         self.images, self.masks = [], []
-        for i in video_dir:
-            imgs = os.listdir(i)
-            self.images.extend([i + '/' + img for img in imgs if not img.startswith(
-                'mask')])  # /content/gdrive/MyDrive/Dataset_Studentnew/Dataset_Student/train/video_
-        # print(self.images[1000])
+        for dir_path in video_dir:
+            imgs = os.listdir(dir_path)
+            self.images.extend([os.path.join(dir_path, img) for img in imgs if not img.startswith('mask')])
+            self.masks.extend([os.path.join(dir_path, img) for img in imgs if img.startswith('mask')])
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, index):
-        img = np.array(Image.open(self.images[index]))
-        x = self.images[index].split('/')
-        image_name = x[-1]
-        mask_index = int(image_name.split("_")[1].split(".")[0])
-        x = x[:-1]
-        mask_path = '/'.join(x)
-        mask = np.load(mask_path + '/mask.npy')
-        try:
-            mask = mask[mask_index, :, :]
-        except IndexError:  # Index is out of the bounds of the array
-            mask = mask[-1, :, :]  # Use the last mask if the index is out of range
+        img = Image.open(self.images[index]).convert('RGB')
+        mask = np.load(self.masks[index])
         if self.transform:
-            img = self.transform(img)  # 应用transform
-
-        mask = torch.tensor(mask, dtype=torch.long)  # 确保掩码也转换为tensor
-
-
+            img = self.transform(img)
+        mask = torch.tensor(mask, dtype=torch.long)
         return img, mask
 
+# Define the transform
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
 
 class encoding_block(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -189,9 +181,9 @@ def objective(trial):
     scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3)
 
     batch_size = trial.suggest_categorical('batch_size', [4, 8, 16, 32, 64])
-    train_dataset = SegmentationDataSet(train_data_dir)
+    train_dataset = SegmentationDataSet(train_data_dir,transform=transform)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_dataset = SegmentationDataSet(val_data_dir)
+    val_dataset = SegmentationDataSet(val_data_dir,transform=transform)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     num_epochs = 30
