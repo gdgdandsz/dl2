@@ -49,5 +49,5 @@ if __name__ == '__main__':
     print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>  start <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     print("Inside Start")
     exp.prediction_eval(args)
-
+    exp.evaluate_iou(args)
     UNET_Module(args)
