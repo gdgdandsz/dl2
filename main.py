@@ -23,10 +23,16 @@ class SegmentationDataSet(Dataset):
     def __init__(self, video_dir, transform=None):
         self.transform = transform
         self.images, self.masks = [], []
+        
         for dir_path in video_dir:
-            imgs = os.listdir(dir_path)
-            self.images.extend([os.path.join(dir_path, img) for img in imgs if not img.startswith('mask')])
-            self.masks.extend([os.path.join(dir_path, img) for img in imgs if img.startswith('mask')])
+            images_list = sorted([img for img in os.listdir(dir_path) if not img.startswith('mask')])
+            masks_list = sorted([img for img in os.listdir(dir_path) if img.startswith('mask')])
+            
+            # Extend the full path to images and masks
+            self.images.extend([os.path.join(dir_path, img) for img in images_list])
+            self.masks.extend([os.path.join(dir_path, msk) for msk in masks_list])
+
+        assert len(self.images) == len(self.masks), "The number of images and masks must be the same"
 
     def __len__(self):
         return len(self.images)
@@ -34,8 +40,10 @@ class SegmentationDataSet(Dataset):
     def __getitem__(self, index):
         img = Image.open(self.images[index]).convert('RGB')
         mask = np.load(self.masks[index])
+        
         if self.transform:
             img = self.transform(img)
+        
         mask = torch.tensor(mask, dtype=torch.long)
         return img, mask
 
