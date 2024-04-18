@@ -183,7 +183,7 @@ def batch_iou_pytorch(SMOOTH, outputs: torch.Tensor, labels: torch.Tensor):
 def objective(trial):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = unet_model().to(device)
-    optimizer = Adam(model.parameters(), lr=trial.suggest_loguniform('lr', 1e-5, 1e-3, 1e-4, 1e-2, 1e-1), weight_decay=1e-4)
+    optimizer = Adam(model.parameters(), lr=trial.suggest_float('lr', 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, log=True), weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
     scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=3)
 
