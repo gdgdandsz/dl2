@@ -20,31 +20,37 @@ from torchvision import transforms
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 # Define the dataset
 class SegmentationDataSet(Dataset):
+
     def __init__(self, video_dir, transform=None):
         self.transform = transform
         self.images, self.masks = [], []
-        
-        for dir_path in video_dir:
-            images_list = sorted([img for img in os.listdir(dir_path) if not img.startswith('mask')])
-            masks_list = sorted([img for img in os.listdir(dir_path) if img.startswith('mask')])
-            
-            # Extend the full path to images and masks
-            self.images.extend([os.path.join(dir_path, img) for img in images_list])
-            self.masks.extend([os.path.join(dir_path, msk) for msk in masks_list])
-
-        assert len(self.images) == len(self.masks), "The number of images and masks must be the same"
+        for i in video_dir:
+            imgs = os.listdir(i)
+            self.images.extend([i + '/' + img for img in imgs if not img.startswith(
+                'mask')])  # /content/gdrive/MyDrive/Dataset_Studentnew/Dataset_Student/train/video_
+        # print(self.images[1000])
 
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, index):
-        img = Image.open(self.images[index]).convert('RGB')
-        mask = np.load(self.masks[index])
-        
+        img = np.array(Image.open(self.images[index]))
+        x = self.images[index].split('/')
+        image_name = x[-1]
+        mask_index = int(image_name.split("_")[1].split(".")[0])
+        x = x[:-1]
+        mask_path = '/'.join(x)
+        mask = np.load(mask_path + '/mask.npy')
+        try:
+            mask = mask[mask_index, :, :]
+        except IndexError:  # Index is out of the bounds of the array
+            mask = mask[-1, :, :]  # Use the last mask if the index is out of range
         if self.transform:
-            img = self.transform(img)
-        
-        mask = torch.tensor(mask, dtype=torch.long)
+            img = self.transform(img)  # 应用transform
+
+        mask = torch.tensor(mask, dtype=torch.long)  # 确保掩码也转换为tensor
+
+
         return img, mask
 
 # Define the transform
