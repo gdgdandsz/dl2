@@ -153,8 +153,8 @@ class Exp:
         total_batches = int(len(vali_loader) * limit_percent)
         vali_pbar = tqdm(itertools.islice(vali_loader, total_batches), total=total_batches)
         for i, (batch_x, batch_y) in enumerate(vali_pbar):
-            if i * batch_x.shape[0] > 1000:
-                break
+            #if i * batch_x.shape[0] > 1000:
+                #break
 
             batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
             pred_y = self.model(batch_x)
