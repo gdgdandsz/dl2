@@ -179,6 +179,32 @@ def batch_iou_pytorch(SMOOTH, outputs: torch.Tensor, labels: torch.Tensor):
 
     return thresholded  # Or thresholded.mean() if you are interested in average across the batch
 
+class CombinedLoss(nn.Module):
+    def __init__(self):
+        super(CombinedLoss, self).__init__()
+        self.ce_loss = nn.CrossEntropyLoss()
+        self.iou_loss = IoULoss()
+
+    def forward(self, inputs, targets):
+        loss_ce = self.ce_loss(inputs, targets)
+        # 使用softmax处理预测结果，以计算IoU损失
+        inputs_soft = F.softmax(inputs, dim=1)
+        loss_iou = self.iou_loss(inputs_soft, F.one_hot(targets, num_classes=inputs.shape[1]).permute(0, 3, 1, 2))
+        # 组合损失，权重可以根据需要调整
+        return 0.5 * loss_ce + 0.5 * loss_iou
+
+class IoULoss(nn.Module):
+    def __init__(self, smooth=1e-6):
+        super(IoULoss, self).__init__()
+        self.smooth = smooth
+
+    def forward(self, preds, targets):
+        intersection = (preds * targets).sum(dim=(2, 3))
+        union = (preds + targets).sum(dim=(2, 3)) - intersection
+        iou = (intersection + self.smooth) / (union + self.smooth)
+        # 返回1 - IoU以作为损失
+        return 1 - iou.mean()
+
 
 # Press the green button in the gutter to run the script.
 if __name__ == "__main__":
