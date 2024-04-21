@@ -224,7 +224,7 @@ if __name__ == "__main__":
     # loss criterion, optimizer
 
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=5e-5)
+    optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
     # 初始
     import torch.optim as optim
     from torch.optim.lr_scheduler import ReduceLROnPlateau
