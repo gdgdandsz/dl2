@@ -244,7 +244,7 @@ if __name__ == "__main__":
 
     # hyperparameters
 
-    LEARNING_RATE = 5e-5
+    LEARNING_RATE = 0.01
     num_epochs = 40
     max_patience = 3
     epochs_no_improve = 0
@@ -253,8 +253,8 @@ if __name__ == "__main__":
 
     # loss criterion, optimizer
 
-    #loss_fn = nn.CrossEntropyLoss()
-    loss_fn = CombinedLoss()
+    loss_fn = nn.CrossEntropyLoss()
+    #loss_fn = CombinedLoss()
     optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
     # 初始
     import torch.optim as optim
