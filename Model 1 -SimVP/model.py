@@ -42,23 +42,18 @@ class Decoder(nn.Module):
         Y = self.readout(Y)
         return Y
 
-
 import torch
 from torch import nn
 from modules import Inception
-
-import torch
-from torch import nn
-from modules import ConvSC, Inception
 
 class Mid_Xnet(nn.Module):
     def __init__(self, channel_in, channel_hid, N_T, H, W, incep_ker, groups):
         super(Mid_Xnet, self).__init__()
 
         self.N_T = N_T
-        # 使用channel_hid作为基准维度可以，但我们需要确保它是512
-        self.downscale = nn.Linear(channel_hid * H * W, 512)  # 从C*H*W降到512
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=512, num_heads=2, batch_first=True)
+        # 将输入数据降维至合理的尺寸，512维可能仍然过高，取决于你的具体应用和可用内存
+        self.downscale = nn.Linear(H * W, 128)  # 从H*W降到一个更小的维度
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=128, num_heads=4, batch_first=True)
 
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
         for i in range(1, N_T-1):
@@ -75,15 +70,16 @@ class Mid_Xnet(nn.Module):
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.view(B, T, C * H * W)
+        x = x.view(B, T, C * H * W)  # 将所有维度合并准备降维
 
-        # 使用线性层降维到512
+        # 降维处理
         x = self.downscale(x)
-        
+
         # 应用Multihead Attention
         attn_output, _ = self.multihead_attn(x, x, x)
-        # 需要确定如何重新变形到合适的输出维度
-        x = attn_output.view(B, T, C, H, W)  # 可能需要调整这里以适应正确的输出维度
+
+        # 注意：这里需要根据实际应用调整输出的维度，重新映射到合适的形状
+        x = attn_output.view(B, T, C, H, W)
 
         x = x.reshape(B, T * C, H, W)  # 准备进入Inception块
 
@@ -101,6 +97,7 @@ class Mid_Xnet(nn.Module):
 
         y = z.view(B, T, C, H, W)
         return y
+
 
 
 
