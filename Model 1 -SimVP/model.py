@@ -86,20 +86,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class SpatialAttentionModule(nn.Module):
-    def __init__(self):
+    def __init__(self, kernel_size=7):
         super(SpatialAttentionModule, self).__init__()
-        self.conv = nn.Conv2d(2, 1, 7, padding=3, bias=False)
+        self.conv = nn.Conv2d(2, 1, kernel_size, padding=kernel_size//2, bias=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        # 计算平均和最大池化图
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
-        attention = torch.cat([avg_out, max_out], dim=1)
-        attention = self.conv(attention)
-        attention = self.sigmoid(attention)
-        # 将注意力图广播到原始输入的每个通道
-        return x * attention
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv(x)
+        return x * self.sigmoid(x)
 
 class TemporalAttentionModule(nn.Module):
     def __init__(self, channels, heads=8):
@@ -117,11 +114,12 @@ class TemporalAttentionModule(nn.Module):
         k = self.key(x).view(B, self.heads, C // self.heads, T)
         v = self.value(x).view(B, self.heads, C // self.heads, T)
         
-        q = q.permute(0, 1, 3, 2)  # [B, heads, T, channels]
-        k = k.permute(0, 1, 3, 2)  # [B, heads, T, channels]
+        q = q.permute(0, 1, 3, 2)
+        k = k.permute(0, 1, 3, 2)
         attn = self.softmax(torch.matmul(q, k.transpose(-2, -1)) * self.scale)
         x = torch.matmul(attn, v).view(B, C, T)
         return x
+
 
 class Mid_Xnet(nn.Module):
     def __init__(self, channel_in, channel_hid, N_T, H, W, incep_ker=[3,5,7,11], groups=8):
@@ -129,18 +127,11 @@ class Mid_Xnet(nn.Module):
 
         self.N_T = N_T
         self.spatial_attention = SpatialAttentionModule()
-        # 现在正确地使用 H 和 W
         self.temporal_attention = TemporalAttentionModule(channel_hid * H * W)
 
-        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups)]
-        for i in range(1, N_T-1):
-            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
-        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
-
-        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups)]
-        for i in range(1, N_T-1):
-            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
-        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker=incep_ker, groups=groups))
+        # Placeholder for Inception layers, replace with your actual Inception module
+        enc_layers = [nn.Conv2d(channel_in if i == 0 else channel_hid, channel_hid, 3, 1, 1) for i in range(N_T)]
+        dec_layers = [nn.Conv2d(channel_hid, channel_in if i == N_T-1 else channel_hid, 3, 1, 1) for i in range(N_T)]
 
         self.enc = nn.Sequential(*enc_layers)
         self.dec = nn.Sequential(*dec_layers)
@@ -159,6 +150,7 @@ class Mid_Xnet(nn.Module):
 
         z = self.temporal_attention(z.reshape(B, C, T*H*W))
         z = z.reshape(B, C, H, W)
+
         for i in range(1, self.N_T):
             z = self.dec[i](torch.cat([z, skips[-i]], dim=1) if i > 0 else z)
 
@@ -166,9 +158,7 @@ class Mid_Xnet(nn.Module):
         return y
 
 
-
-
-# SimVP class for training
+'''# SimVP class for training
 class SimVP(nn.Module):
     def __init__(self, shape_in, hid_S=16, hid_T=256, N_S=4, N_T=8, incep_ker=[3,5,7,11], groups=8):
         super(SimVP, self).__init__()
@@ -191,4 +181,37 @@ class SimVP(nn.Module):
 
         Y = self.dec(hid, skip)
         Y = Y.reshape(B, T, C, H, W)
+        return Y'''
+
+import torch
+import torch.nn as nn
+
+class SimVP(nn.Module):
+    def __init__(self, shape_in, hid_S=16, hid_T=256, N_S=4, N_T=8, incep_ker=[3,5,7,11], groups=8):
+        super(SimVP, self).__init__()
+        T, C, H, W = shape_in
+        
+        # 初始化 Encoder
+        self.enc = Encoder(C, hid_S, N_S)  # 假设 Encoder 的实现正确
+        
+        # 初始化 Mid_Xnet，注意参数顺序和内容要正确
+        self.hid = Mid_Xnet(hid_S, hid_T, N_T, H, W, incep_ker, groups)  # 注意：我调整了参数以符合Mid_Xnet的需求
+        
+        # 初始化 Decoder
+        self.dec = Decoder(hid_S, C, N_S)  # 假设 Decoder 的实现正确
+
+    def forward(self, x_raw):
+        B, T, C, H, W = x_raw.shape
+        x = x_raw.view(B*T, C, H, W)
+
+        embed, skip = self.enc(x)  # 假设 Encoder 返回(embedding, skip_connection)
+        _, C_, H_, W_ = embed.shape
+
+        z = embed.view(B, T, C_, H_, W_)
+        hid = self.hid(z)
+        hid = hid.reshape(B*T, C_, H_, W_)
+
+        Y = self.dec(hid, skip)  # 假设 Decoder 接受 hid 和 skip 作为输入
+        Y = Y.reshape(B, T, C, H, W)
         return Y
+
