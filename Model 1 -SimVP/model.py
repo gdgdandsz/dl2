@@ -43,17 +43,31 @@ class Decoder(nn.Module):
         return Y
 
 class PostProcessingAttention(nn.Module):
-    def __init__(self, channels, num_heads=1):
+    def __init__(self, channels, num_heads=8):
         super(PostProcessingAttention, self).__init__()
+        # Ensure the number of heads is a divisor of the number of channels
+        if channels % num_heads != 0:
+            num_heads = 1  # Fallback to 1 head if channels aren't divisible as an example
         self.attention = nn.MultiheadAttention(embed_dim=channels, num_heads=num_heads, batch_first=True)
 
     def forward(self, x):
-        # x expected to be in shape [batch, channels, height, width]
-        B, C, H, W = x.shape
-        x = x.permute(0, 2, 3, 1).reshape(B * H * W, C)  # Flatten spatially and treat each point as a sequence element
-        x, _ = self.attention(x, x, x)  # Self-attention
-        x = x.view(B, H, W, C).permute(0, 3, 1, 2)  # Reshape back to the original
+        original_shape = x.shape
+        if len(original_shape) == 4:
+            # If the input tensor has the shape [B, C, H, W], reshape to [B*H*W, C] for attention
+            B, C, H, W = original_shape
+            x = x.permute(0, 2, 3, 1).reshape(B * H * W, C)  # Reshape for attention
+        else:
+            raise ValueError("Expected 4D input tensor [B, C, H, W] but got shape {}".format(original_shape))
+
+        # Apply attention
+        x, _ = self.attention(x, x, x)
+        
+        if len(original_shape) == 4:
+            # Reshape back to the original after attention
+            x = x.view(B, H, W, C).permute(0, 3, 1, 2)
+
         return x
+
 
 # Mid_Xnet module
 class Mid_Xnet(nn.Module):
