@@ -42,64 +42,57 @@ class Decoder(nn.Module):
         Y = self.readout(Y)
         return Y
 
-import torch
-from torch import nn
-from modules import Inception
-
-class SpatialAttention(nn.Module):
-    def __init__(self):
-        super(SpatialAttention, self).__init__()
-        self.conv1 = nn.Conv2d(2, 1, kernel_size=7, padding=3, bias=False)
-        self.sigmoid = nn.Sigmoid()
+class PostProcessingAttention(nn.Module):
+    def __init__(self, channels, num_heads=8):
+        super(PostProcessingAttention, self).__init__()
+        self.attention = nn.MultiheadAttention(embed_dim=channels, num_heads=num_heads, batch_first=True)
 
     def forward(self, x):
-        avg_out = torch.mean(x, dim=1, keepdim=True)
-        max_out, _ = torch.max(x, dim=1, keepdim=True)
-        x = torch.cat([avg_out, max_out], dim=1)
-        x = self.conv1(x)
-        return x * self.sigmoid(x)  # Element-wise multiplication for attention application
+        # x expected to be in shape [batch, channels, height, width]
+        B, C, H, W = x.shape
+        x = x.permute(0, 2, 3, 1).reshape(B * H * W, C)  # Flatten spatially and treat each point as a sequence element
+        x, _ = self.attention(x, x, x)  # Self-attention
+        x = x.view(B, H, W, C).permute(0, 3, 1, 2)  # Reshape back to the original
+        return x
 
-import torch
-from torch import nn
-from modules import Inception
-
+# Mid_Xnet module
 class Mid_Xnet(nn.Module):
-    def __init__(self, channel_in, channel_hid, N_T, incep_ker=[3,5,7,11], groups=8):
+    def __init__(self, channel_in, channel_hid, N_T, incep_ker = [3,5,7,11], groups=8):
         super(Mid_Xnet, self).__init__()
+
         self.N_T = N_T
+        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
+        for i in range(1, N_T-1):
+            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
+        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
 
-        # Initialize encoder and decoder layers
-        self.enc = nn.ModuleList([Inception(channel_in if i == 0 else channel_hid, channel_hid//2, channel_hid, incep_ker, groups) for i in range(N_T)])
-        self.dec = nn.ModuleList([Inception(channel_hid if i < N_T-1 else 2*channel_hid, channel_hid//2, channel_hid if i < N_T-1 else channel_in, incep_ker, groups) for i in range(N_T)])
+        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
+        for i in range(1, N_T-1):
+            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
+        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker= incep_ker, groups=groups))
 
-        # Attention module initialization
-        self.attention = nn.ModuleList([nn.Conv2d(channel_hid, channel_hid, 1) for _ in range(N_T)])  # Using 1x1 conv to simulate attention
+        self.enc = nn.Sequential(*enc_layers)
+        self.dec = nn.Sequential(*dec_layers)
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.reshape(B * T, C, H, W)  # Flatten batch and time dimensions
+        x = x.reshape(B, T*C, H, W)
 
-        # Encoder with attention
+        # Encoder
         skips = []
+        z = x
         for i in range(self.N_T):
-            x = self.enc[i](x)
-            attention_out = self.attention[i](x)
+            z = self.enc[i](z)
             if i < self.N_T - 1:
-                skips.append(attention_out)
-            x = attention_out
+                skips.append(z)
 
         # Decoder
-        for i in range(self.N_T):
-            if i > 0:
-                x = torch.cat([x, skips[-i]], dim=1)  # Concatenate skip connection
-            x = self.dec[i](x)
+        z = self.dec[0](z)
+        for i in range(1, self.N_T):
+            z = self.dec[i](torch.cat([z, skips[-i]], dim=1))
 
-        x = x.reshape(B, T, C, H, W)  # Restore original dimensions
-        return x
-
-# Ensure that attention modules do not alter the number of channels
-
-
+        y = z.reshape(B, T, C, H, W)
+        return y
 
 # SimVP class for training
 class SimVP(nn.Module):
@@ -109,7 +102,7 @@ class SimVP(nn.Module):
         self.enc = Encoder(C, hid_S, N_S)
         self.hid = Mid_Xnet(T*hid_S, hid_T, N_T, incep_ker, groups)
         self.dec = Decoder(hid_S, C, N_S)
-
+        self.post_attention = PostProcessingAttention(C)  # Attention after the decoder
 
     def forward(self, x_raw):
         B, T, C, H, W = x_raw.shape
@@ -122,6 +115,7 @@ class SimVP(nn.Module):
         hid = self.hid(z)
         hid = hid.reshape(B*T, C_, H_, W_)
 
-        Y = self.dec(hid, skip)
-        Y = Y.reshape(B, T, C, H, W)
-        return Y
+        y = self.dec(hid, skip)
+        y = y.view(B, T, C, H, W)  # Reshape before attention
+        y = self.post_attention(y)  # Apply attention
+        return y
