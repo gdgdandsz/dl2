@@ -53,7 +53,7 @@ class Mid_Xnet(nn.Module):
         self.N_T = N_T
         # 将输入数据降维至合理的尺寸，512维可能仍然过高，取决于你的具体应用和可用内存
         self.downscale = nn.Linear(H * W, 128)  # 从H*W降到一个更小的维度
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=128, num_heads=4, batch_first=True)
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=128, num_heads=8, batch_first=True)
 
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
         for i in range(1, N_T-1):
