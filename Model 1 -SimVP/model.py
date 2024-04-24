@@ -48,13 +48,12 @@ from torch import nn
 from modules import Inception
 
 class Mid_Xnet(nn.Module):
-    def __init__(self, channel_in, channel_hid, N_T, H, W, incep_ker=[3,5,7,11], groups=8):
+    def __init__(self, channel_in, channel_hid, N_T, H, W, incep_ker, groups):
         super(Mid_Xnet, self).__init__()
 
         self.N_T = N_T
-        embed_dim = channel_hid * H * W
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=8, batch_first=True)
-
+        # 使用channel_hid作为embed_dim，或者考虑更小的合理值
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=channel_hid, num_heads=8, batch_first=True)
 
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
         for i in range(1, N_T-1):
@@ -71,11 +70,11 @@ class Mid_Xnet(nn.Module):
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.view(B, T, C * H * W)
+        x = x.view(B, T, C * H * W)  # This can be adjusted if too large
 
         # Applying Multihead Attention
         attn_output, _ = self.multihead_attn(x, x, x)
-        x = attn_output.view(B, T, C, H, W)
+        x = attn_output.view(B, T, C, H, W)  # Reshape back to original dimensions
 
         x = x.reshape(B, T * C, H, W)  # Prepare for Inception blocks
 
