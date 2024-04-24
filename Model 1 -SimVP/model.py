@@ -47,26 +47,28 @@ class PostProcessingAttention(nn.Module):
         super(PostProcessingAttention, self).__init__()
         # Ensure the number of heads is a divisor of the number of channels
         if channels % num_heads != 0:
-            num_heads = 1  # Fallback to 1 head if channels aren't divisible as an example
+            raise ValueError("Number of channels must be divisible by number of heads for multi-head attention")
         self.attention = nn.MultiheadAttention(embed_dim=channels, num_heads=num_heads, batch_first=True)
 
     def forward(self, x):
         original_shape = x.shape
-        if len(original_shape) == 4:
-            # If the input tensor has the shape [B, C, H, W], reshape to [B*H*W, C] for attention
-            B, C, H, W = original_shape
-            x = x.permute(0, 2, 3, 1).reshape(B * H * W, C)  # Reshape for attention
-        else:
-            raise ValueError("Expected 4D input tensor [B, C, H, W] but got shape {}".format(original_shape))
+        if len(original_shape) != 5:
+            raise ValueError("Expected 5D input tensor [B, T, C, H, W] but got shape {}".format(original_shape))
+
+        B, T, C, H, W = original_shape
+        # Reshape to [B*T, C, H*W] for attention, treating spatial dimensions as sequence
+        x = x.permute(0, 1, 3, 4, 2).reshape(B * T, H * W, C)  # Reshape for attention: [batch, seq_len, features]
 
         # Apply attention
-        x, _ = self.attention(x, x, x)
-        
-        if len(original_shape) == 4:
-            # Reshape back to the original after attention
-            x = x.view(B, H, W, C).permute(0, 3, 1, 2)
+        x = x.permute(2, 0, 1)  # Permute for MultiheadAttention: [seq_len, batch, features]
+        attn_output, _ = self.attention(x, x, x)
+        x = attn_output.permute(1, 2, 0)  # Permute back: [batch, features, seq_len]
+
+        # Reshape back to the original shape after attention
+        x = x.view(B, T, H, W, C).permute(0, 1, 4, 2, 3)  # Reshape back to [B, T, C, H, W]
 
         return x
+
 
 
 # Mid_Xnet module
