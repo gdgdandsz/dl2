@@ -50,11 +50,13 @@ class Mid_Xnet(nn.Module):
     def __init__(self, channel_in, channel_hid, N_T, H, W, incep_ker, groups):
         super(Mid_Xnet, self).__init__()
         self.N_T = N_T
+        # 确保embed_dim正确设置为想要的下采样维度
+        embed_dim = 128
 
-        # 假设channel_hid是每通道的特征数量
-        input_dim = H * W  # 每通道的空间特征数量
-        self.downscale = nn.Linear(input_dim, 128)  # 从H*W降到128
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=128, num_heads=8, batch_first=True)
+        # 保证下采样前的尺寸正确
+        # 需要下采样的维度是H*W，对于每个通道都是一样的
+        self.downscale = nn.Linear(H * W, embed_dim)  # 将每个通道的H*W降维到embed_dim
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=8, batch_first=True)
 
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
         for i in range(1, N_T-1):
@@ -71,14 +73,14 @@ class Mid_Xnet(nn.Module):
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.view(B, T, C * H * W)  # 将所有维度合并
+        x = x.view(B, T, C * H * W)
 
-        # Flatten the dimensions to (B * T, C * H * W) before downscale
-        x = x.view(B * T, C * H * W)  # 调整维度以符合下降尺寸
-        x = self.downscale(x.view(B * T, -1))  # 降维处理
+        # Flatten the dimensions to (B * T * C, H * W)
+        x = x.view(B * T * C, H * W)
+        x = self.downscale(x)  # 降维处理
 
         # 调整形状以符合多头注意力的要求
-        x = x.view(B, T, 128)
+        x = x.view(B, T * C, embed_dim)
 
         # 应用Multihead Attention
         attn_output, _ = self.multihead_attn(x, x, x)
@@ -101,6 +103,7 @@ class Mid_Xnet(nn.Module):
 
         y = z.view(B, T, C, H, W)
         return y
+
 
 
 # SimVP class for training
