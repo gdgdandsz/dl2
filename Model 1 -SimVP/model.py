@@ -43,22 +43,21 @@ class Decoder(nn.Module):
         return Y
 
 
+# Mid_Xnet module
 class Mid_Xnet(nn.Module):
-    def __init__(self, channel_in, channel_hid, N_T, incep_ker=[3,5,7,11], groups=8):
+    def __init__(self, channel_in, channel_hid, N_T, incep_ker = [3,5,7,11], groups=8):
         super(Mid_Xnet, self).__init__()
+
         self.N_T = N_T
-        self.spatial_attention = SpatialAttentionModule()
-        self.temporal_attention = TemporalAttentionModule(channel_hid)
-
-        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups)]
+        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
         for i in range(1, N_T-1):
-            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
-        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
+            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
+        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
 
-        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups)]
+        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
         for i in range(1, N_T-1):
-            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
-        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker=incep_ker, groups=groups))
+            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
+        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker= incep_ker, groups=groups))
 
         self.enc = nn.Sequential(*enc_layers)
         self.dec = nn.Sequential(*dec_layers)
@@ -67,67 +66,21 @@ class Mid_Xnet(nn.Module):
         B, T, C, H, W = x.shape
         x = x.reshape(B, T*C, H, W)
 
-        # Encoder with spatial attention
+        # Encoder
         skips = []
         z = x
         for i in range(self.N_T):
             z = self.enc[i](z)
-            z = self.spatial_attention(z)  # Apply spatial attention
             if i < self.N_T - 1:
                 skips.append(z)
 
-        # Apply temporal attention before decoding
-        z = z.reshape(B, T, C, H, W)
-        z = self.temporal_attention(z)
-        z = z.reshape(B, T*C, H, W)
-
         # Decoder
-        for i in range(self.N_T):
-            z = self.dec[i](torch.cat([z, skips[-i]], dim=1)) if i > 0 else self.dec[i](z)
+        z = self.dec[0](z)
+        for i in range(1, self.N_T):
+            z = self.dec[i](torch.cat([z, skips[-i]], dim=1))
 
         y = z.reshape(B, T, C, H, W)
         return y
-
-        
-class SpatialAttentionModule(nn.Module):
-    def __init__(self):
-        super(SpatialAttentionModule, self).__init__()
-        self.compress = nn.Conv2d(2, 1, 1, bias=False)  # 压缩输入的两个通道到一个通道
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        # 使用全局平均池化和最大池化来获取通道的注意力图
-        avg_out = torch.mean(x, dim=1, keepdim=True)
-        max_out, _ = torch.max(x, dim=1, keepdim=True)
-        attn = torch.cat([avg_out, max_out], dim=1)
-        attn = self.compress(attn)
-        attn = self.sigmoid(attn)
-        return x * attn
-
-
-class TemporalAttentionModule(nn.Module):
-    def __init__(self, channels, heads=8):
-        super(TemporalAttentionModule, self).__init__()
-        self.heads = heads
-        self.scale = (channels // heads) ** -0.5
-        self.query = nn.Conv1d(channels, channels, 1)
-        self.key = nn.Conv1d(channels, channels, 1)
-        self.value = nn.Conv1d(channels, channels, 1)
-        self.softmax = nn.Softmax(dim=-1)
-
-    def forward(self, x):
-        # x should be reshaped to (Batch, Channel, Time) before being passed here
-        B, C, T = x.size()
-        q = self.query(x).view(B, self.heads, C // self.heads, T)
-        k = self.key(x).view(B, self.heads, C // self.heads, T)
-        v = self.value(x).view(B, self.heads, C // self.heads, T)
-
-        q = q.permute(0, 1, 3, 2)  # Prepare for batch matrix multiplication
-        k = k.permute(0, 1, 3, 2)
-        attn = self.softmax(torch.matmul(q, k.transpose(-2, -1)) * self.scale)
-        x = torch.matmul(attn, v).view(B, C, T)
-        return x
-
 
 # SimVP class for training
 class SimVP(nn.Module):
