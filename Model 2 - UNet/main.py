@@ -195,7 +195,7 @@ class CombinedLoss(nn.Module):
         inputs_soft = F.softmax(inputs, dim=1)
         loss_iou = self.iou_loss(inputs_soft, F.one_hot(targets, num_classes=inputs.shape[1]).permute(0, 3, 1, 2))
         # 组合损失，权重可以根据需要调整
-        return 0.4 * loss_ce + 0.6 * loss_iou
+        return 0.5 * loss_ce + 0.5 * loss_iou
 
 class IoULoss(nn.Module):
     def __init__(self, smooth=1e-6):
@@ -244,7 +244,7 @@ if __name__ == "__main__":
 
     # hyperparameters
 
-    LEARNING_RATE = 0.0005
+    LEARNING_RATE = 0.001
     num_epochs = 50
     max_patience = 3
     epochs_no_improve = 0
@@ -255,7 +255,7 @@ if __name__ == "__main__":
 
     #loss_fn = nn.CrossEntropyLoss()
     loss_fn = CombinedLoss()
-    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=0.0001)
+    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=0.001)
     # 初始
     import torch.optim as optim
     from torch.optim.lr_scheduler import ReduceLROnPlateau
