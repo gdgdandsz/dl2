@@ -244,7 +244,7 @@ if __name__ == "__main__":
 
     # hyperparameters
 
-    LEARNING_RATE = 0.001
+    LEARNING_RATE = 0.01
     num_epochs = 50
     max_patience = 3
     epochs_no_improve = 0
@@ -255,7 +255,7 @@ if __name__ == "__main__":
 
     #loss_fn = nn.CrossEntropyLoss()
     loss_fn = CombinedLoss()
-    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=0.001)
+    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=0.01)
     # 初始
     import torch.optim as optim
     from torch.optim.lr_scheduler import ReduceLROnPlateau
