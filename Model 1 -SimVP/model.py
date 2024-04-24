@@ -121,21 +121,21 @@ class TemporalAttentionModule(nn.Module):
         return x
 
 
+
 class Mid_Xnet(nn.Module):
     def __init__(self, channel_in, channel_hid, N_T, H, W, incep_ker=[3,5,7,11], groups=8):
         super(Mid_Xnet, self).__init__()
-
         self.N_T = N_T
         self.spatial_attention = SpatialAttentionModule()
-        self.temporal_attention = TemporalAttentionModule(channel_hid * H * W)
+        self.temporal_attention = TemporalAttentionModule(channel_hid)  # 只使用 channel_hid
+
 
         # Placeholder for Inception layers, replace with your actual Inception module
         enc_layers = [nn.Conv2d(channel_in if i == 0 else channel_hid, channel_hid, 3, 1, 1) for i in range(N_T)]
         dec_layers = [nn.Conv2d(channel_hid, channel_in if i == N_T-1 else channel_hid, 3, 1, 1) for i in range(N_T)]
 
-        self.enc = nn.Sequential(*enc_layers)
-        self.dec = nn.Sequential(*dec_layers)
-
+        self.enc = nn.Sequential(*[nn.Conv2d(channel_in if i == 0 else channel_hid, channel_hid, 3, 1, 1) for i in range(N_T)])
+        self.dec = nn.Sequential(*[nn.Conv2d(channel_hid, channel_in if i == N_T-1 else channel_hid, 3, 1, 1) for i in range(N_T)])
     def forward(self, x):
         B, T, C, H, W = x.shape
         x = x.reshape(B, T*C, H, W)
