@@ -127,9 +127,9 @@ class Mid_Xnet(nn.Module):
         super(Mid_Xnet, self).__init__()
         self.N_T = N_T
         self.spatial_attention = SpatialAttentionModule()
-        self.temporal_attention = TemporalAttentionModule(channel_hid)  # 假定 temporal attention 适用于编码后的特征维度
+        self.temporal_attention = TemporalAttentionModule(channel_hid)  # 假定这适用于编码后的特征维度
 
-        # Placeholder for Inception layers
+        # 假设 Inception 模块维护通道数一致性
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups) for _ in range(N_T)]
         dec_layers = [Inception(channel_hid, channel_hid//2, channel_in, incep_ker, groups) for _ in range(N_T)]
 
@@ -138,7 +138,7 @@ class Mid_Xnet(nn.Module):
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.reshape(B, T*C, H, W)
+        x = x.reshape(B, T*C, H, W)  # 这里可能需要调整以确保维度正确
 
         skips = []
         z = x
