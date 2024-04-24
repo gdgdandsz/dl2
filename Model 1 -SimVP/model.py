@@ -42,55 +42,30 @@ class Decoder(nn.Module):
         Y = self.readout(Y)
         return Y
 
-import torch
-from torch import nn
-from modules import Inception
-
+# Mid_Xnet module
 class Mid_Xnet(nn.Module):
-    def __init__(self, channel_in, channel_hid, N_T, H, W, incep_ker, groups):
+    def __init__(self, channel_in, channel_hid, N_T, incep_ker = [3,5,7,11], groups=8):
         super(Mid_Xnet, self).__init__()
+
         self.N_T = N_T
-        # 确保embed_dim正确设置为想要的下采样维度
-        embed_dim = 128
-
-        # 保证下采样前的尺寸正确
-        # 需要下采样的维度是H*W，对于每个通道都是一样的
-        self.downscale = nn.Linear(H * W, embed_dim)  # 将每个通道的H*W降维到embed_dim
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=8, batch_first=True)
-
-        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
+        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
         for i in range(1, N_T-1):
-            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker, groups))
-        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker, groups))
+            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
+        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
 
-        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker, groups)]
+        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
         for i in range(1, N_T-1):
-            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker, groups))
-        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker, groups))
+            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
+        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker= incep_ker, groups=groups))
 
         self.enc = nn.Sequential(*enc_layers)
         self.dec = nn.Sequential(*dec_layers)
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.view(B, T, C * H * W)
+        x = x.reshape(B, T*C, H, W)
 
-        # Flatten the dimensions to (B * T * C, H * W)
-        x = x.view(B * T * C, H * W)
-        x = self.downscale(x)  # 降维处理
-
-        # 调整形状以符合多头注意力的要求
-        x = x.view(B, T * C, embed_dim)
-
-        # 应用Multihead Attention
-        attn_output, _ = self.multihead_attn(x, x, x)
-
-        # 重塑输出以配合下一步
-        x = attn_output.view(B, T, C, H, W)
-
-        # 重塑以进入编码解码块
-        x = x.reshape(B, T * C, H, W)
-
+        # Encoder
         skips = []
         z = x
         for i in range(self.N_T):
@@ -98,13 +73,13 @@ class Mid_Xnet(nn.Module):
             if i < self.N_T - 1:
                 skips.append(z)
 
+        # Decoder
+        z = self.dec[0](z)
         for i in range(1, self.N_T):
             z = self.dec[i](torch.cat([z, skips[-i]], dim=1))
 
-        y = z.view(B, T, C, H, W)
+        y = z.reshape(B, T, C, H, W)
         return y
-
-
 
 # SimVP class for training
 class SimVP(nn.Module):
@@ -112,7 +87,7 @@ class SimVP(nn.Module):
         super(SimVP, self).__init__()
         T, C, H, W = shape_in
         self.enc = Encoder(C, hid_S, N_S)
-        self.hid = Mid_Xnet(T*hid_S, hid_T, N_T, H, W, incep_ker, groups)
+        self.hid = Mid_Xnet(T*hid_S, hid_T, N_T, incep_ker, groups)
         self.dec = Decoder(hid_S, C, N_S)
 
 
