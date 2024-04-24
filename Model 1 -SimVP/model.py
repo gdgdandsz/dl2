@@ -47,13 +47,19 @@ import torch
 from torch import nn
 from modules import Inception
 
+import torch
+from torch import nn
+from modules import ConvSC, Inception
+
 class Mid_Xnet(nn.Module):
     def __init__(self, channel_in, channel_hid, N_T, H, W, incep_ker, groups):
         super(Mid_Xnet, self).__init__()
 
         self.N_T = N_T
-        # 使用channel_hid作为embed_dim，或者考虑更小的合理值
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=channel_hid, num_heads=8, batch_first=True)
+        self.embedding_dim = 512  # 设定一个固定的embedding维度
+        # 初始化一个线性层来降维到512
+        self.downscale = nn.Linear(channel_hid * H * W, self.embedding_dim)
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=self.embedding_dim, num_heads=8, batch_first=True)
 
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
         for i in range(1, N_T-1):
@@ -70,13 +76,16 @@ class Mid_Xnet(nn.Module):
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.view(B, T, C * H * W)  # This can be adjusted if too large
+        x = x.view(B, T, C * H * W)
 
-        # Applying Multihead Attention
+        # 使用线性层降维到512
+        x = self.downscale(x)
+        
+        # 应用Multihead Attention
         attn_output, _ = self.multihead_attn(x, x, x)
-        x = attn_output.view(B, T, C, H, W)  # Reshape back to original dimensions
+        x = attn_output.view(B, T, C, H, W)  # 这里的重新形状可能需要根据实际情况调整
 
-        x = x.reshape(B, T * C, H, W)  # Prepare for Inception blocks
+        x = x.reshape(B, T * C, H, W)  # 准备进入Inception块
 
         # Encoder
         skips = []
@@ -92,6 +101,7 @@ class Mid_Xnet(nn.Module):
 
         y = z.view(B, T, C, H, W)
         return y
+
 
 
 
