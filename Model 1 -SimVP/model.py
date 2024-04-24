@@ -52,7 +52,9 @@ class Mid_Xnet(nn.Module):
         super(Mid_Xnet, self).__init__()
 
         self.N_T = N_T
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=channel_hid * H * W, num_heads=8, batch_first=True)
+        embed_dim = channel_hid * H * W
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=8, batch_first=True)
+
 
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
         for i in range(1, N_T-1):
@@ -100,7 +102,7 @@ class SimVP(nn.Module):
         super(SimVP, self).__init__()
         T, C, H, W = shape_in
         self.enc = Encoder(C, hid_S, N_S)
-        self.hid = Mid_Xnet(T*hid_S, hid_T, N_T, incep_ker, groups)
+        self.hid = Mid_Xnet(T*hid_S, hid_T, N_T, H, W, incep_ker, groups)
         self.dec = Decoder(hid_S, C, N_S)
 
 
