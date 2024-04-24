@@ -52,7 +52,6 @@ class Mid_Xnet(nn.Module):
         super(Mid_Xnet, self).__init__()
 
         self.N_T = N_T
-        # Assuming the number of channels output by the Inception module is `channel_hid`
         self.multihead_attn = nn.MultiheadAttention(embed_dim=channel_hid * H * W, num_heads=8, batch_first=True)
 
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
@@ -70,11 +69,11 @@ class Mid_Xnet(nn.Module):
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.view(B, T, C * H * W)  # Flatten spatial dimensions
+        x = x.view(B, T, C * H * W)
 
         # Applying Multihead Attention
         attn_output, _ = self.multihead_attn(x, x, x)
-        x = attn_output.view(B, T, C, H, W)  # Reshape back to original dimensions
+        x = attn_output.view(B, T, C, H, W)
 
         x = x.reshape(B, T * C, H, W)  # Prepare for Inception blocks
 
@@ -92,6 +91,7 @@ class Mid_Xnet(nn.Module):
 
         y = z.view(B, T, C, H, W)
         return y
+
 
 
 # SimVP class for training
