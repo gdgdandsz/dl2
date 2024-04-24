@@ -48,12 +48,12 @@ from torch import nn
 from modules import Inception
 
 class Mid_Xnet(nn.Module):
-    def __init__(self, channel_in, channel_hid, N_T, incep_ker=[3,5,7,11], groups=8):
+    def __init__(self, channel_in, channel_hid, N_T, H, W, incep_ker=[3,5,7,11], groups=8):
         super(Mid_Xnet, self).__init__()
 
         self.N_T = N_T
-        # Assuming that each Inception layer outputs channel_hid channels
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=channel_hid, num_heads=8, batch_first=True)
+        # Assuming the number of channels output by the Inception module is `channel_hid`
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=channel_hid * H * W, num_heads=8, batch_first=True)
 
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
         for i in range(1, N_T-1):
@@ -70,15 +70,13 @@ class Mid_Xnet(nn.Module):
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        # Flattening spatial dimensions for attention, assume each feature map as a separate feature
-        x = x.view(B, T, C * H * W)
+        x = x.view(B, T, C * H * W)  # Flatten spatial dimensions
 
         # Applying Multihead Attention
         attn_output, _ = self.multihead_attn(x, x, x)
-        # Reshape to original spatial dimensions
-        x = attn_output.view(B, T, C, H, W)
+        x = attn_output.view(B, T, C, H, W)  # Reshape back to original dimensions
 
-        x = x.reshape(B, T * C, H, W)  # Reshape for Inception blocks
+        x = x.reshape(B, T * C, H, W)  # Prepare for Inception blocks
 
         # Encoder
         skips = []
