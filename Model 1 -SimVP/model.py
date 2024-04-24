@@ -50,11 +50,11 @@ class Mid_Xnet(nn.Module):
     def __init__(self, channel_in, channel_hid, N_T, H, W, incep_ker, groups):
         super(Mid_Xnet, self).__init__()
         self.N_T = N_T
-        input_dim = channel_hid * H * W  # 具体维度取决于之前层的输出，确保这里是正确的
-        self.downscale = nn.Linear(input_dim, 128)  # 确保这里的input_dim与实际输入尺寸一致
+        # 计算输入到多头注意力机制的维度应为 H*W，我们使用这个维度进行下采样
+        self.downscale = nn.Linear(H * W, 128)  # 从H*W降到128
         self.multihead_attn = nn.MultiheadAttention(embed_dim=128, num_heads=8, batch_first=True)
 
-        # Inception层定义保持不变
+        # 初始化Inception层
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
         for i in range(1, N_T-1):
             enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker, groups))
@@ -70,20 +70,23 @@ class Mid_Xnet(nn.Module):
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.view(B, T, C * H * W)  # 将所有维度合并准备降维
+        x = x.view(B, T, C * H * W)  # 将所有维度合并
 
-        # 降维处理
+        # 将特征从每个通道的空间尺寸降维
+        x = x.view(B * T * C, H * W)
         x = self.downscale(x)
+
+        # 调整形状以符合多头注意力的要求
+        x = x.view(B, T * C, 128)
 
         # 应用Multihead Attention
         attn_output, _ = self.multihead_attn(x, x, x)
 
-        # 注意：这里需要根据实际应用调整输出的维度，重新映射到合适的形状
+        # 调整输出形状回原始维度，这里需要根据实际情况修改
         x = attn_output.view(B, T, C, H, W)
+        x = x.reshape(B, T * C, H, W)
 
-        x = x.reshape(B, T * C, H, W)  # 准备进入Inception块
-
-        # Encoder
+        # 通过Inception模块进行编码和解码
         skips = []
         z = x
         for i in range(self.N_T):
@@ -91,15 +94,11 @@ class Mid_Xnet(nn.Module):
             if i < self.N_T - 1:
                 skips.append(z)
 
-        # Decoder
         for i in range(1, self.N_T):
             z = self.dec[i](torch.cat([z, skips[-i]], dim=1))
 
         y = z.view(B, T, C, H, W)
         return y
-
-
-
 
 
 # SimVP class for training
