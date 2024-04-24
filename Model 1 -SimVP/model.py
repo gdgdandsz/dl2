@@ -127,15 +127,15 @@ class Mid_Xnet(nn.Module):
         super(Mid_Xnet, self).__init__()
         self.N_T = N_T
         self.spatial_attention = SpatialAttentionModule()
-        self.temporal_attention = TemporalAttentionModule(channel_hid)  # 只使用 channel_hid
+        self.temporal_attention = TemporalAttentionModule(channel_hid)  # 假定 temporal attention 适用于编码后的特征维度
 
+        # Placeholder for Inception layers
+        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups) for _ in range(N_T)]
+        dec_layers = [Inception(channel_hid, channel_hid//2, channel_in, incep_ker, groups) for _ in range(N_T)]
 
-        # Placeholder for Inception layers, replace with your actual Inception module
-        enc_layers = [nn.Conv2d(channel_in if i == 0 else channel_hid, channel_hid, 3, 1, 1) for i in range(N_T)]
-        dec_layers = [nn.Conv2d(channel_hid, channel_in if i == N_T-1 else channel_hid, 3, 1, 1) for i in range(N_T)]
+        self.enc = nn.Sequential(*enc_layers)
+        self.dec = nn.Sequential(*dec_layers)
 
-        self.enc = nn.Sequential(*[nn.Conv2d(channel_in if i == 0 else channel_hid, channel_hid, 3, 1, 1) for i in range(N_T)])
-        self.dec = nn.Sequential(*[nn.Conv2d(channel_hid, channel_in if i == N_T-1 else channel_hid, 3, 1, 1) for i in range(N_T)])
     def forward(self, x):
         B, T, C, H, W = x.shape
         x = x.reshape(B, T*C, H, W)
@@ -156,6 +156,7 @@ class Mid_Xnet(nn.Module):
 
         y = z.reshape(B, T, C, H, W)
         return y
+
 
 
 '''# SimVP class for training
@@ -190,28 +191,22 @@ class SimVP(nn.Module):
     def __init__(self, shape_in, hid_S=16, hid_T=256, N_S=4, N_T=8, incep_ker=[3,5,7,11], groups=8):
         super(SimVP, self).__init__()
         T, C, H, W = shape_in
-        
-        # 初始化 Encoder
-        self.enc = Encoder(C, hid_S, N_S)  # 假设 Encoder 的实现正确
-        
-        # 初始化 Mid_Xnet，注意参数顺序和内容要正确
-        self.hid = Mid_Xnet(hid_S, hid_T, N_T, H, W, incep_ker, groups)  # 注意：我调整了参数以符合Mid_Xnet的需求
-        
-        # 初始化 Decoder
-        self.dec = Decoder(hid_S, C, N_S)  # 假设 Decoder 的实现正确
+        self.enc = Encoder(C, hid_S, N_S)
+        self.hid = Mid_Xnet(hid_S, hid_T, N_T, H, W, incep_ker, groups)
+        self.dec = Decoder(hid_S, C, N_S)
 
     def forward(self, x_raw):
         B, T, C, H, W = x_raw.shape
         x = x_raw.view(B*T, C, H, W)
 
-        embed, skip = self.enc(x)  # 假设 Encoder 返回(embedding, skip_connection)
+        embed, skip = self.enc(x)
         _, C_, H_, W_ = embed.shape
 
         z = embed.view(B, T, C_, H_, W_)
         hid = self.hid(z)
         hid = hid.reshape(B*T, C_, H_, W_)
 
-        Y = self.dec(hid, skip)  # 假设 Decoder 接受 hid 和 skip 作为输入
+        Y = self.dec(hid, skip)
         Y = Y.reshape(B, T, C, H, W)
         return Y
 
