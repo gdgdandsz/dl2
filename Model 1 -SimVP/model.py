@@ -90,18 +90,20 @@ class Mid_Xnet(nn.Module):
 
         
 class SpatialAttentionModule(nn.Module):
-    def __init__(self, kernel_size=7):
+    def __init__(self):
         super(SpatialAttentionModule, self).__init__()
-        self.conv = nn.Conv2d(2, 1, kernel_size, padding=kernel_size//2, bias=False)
+        self.compress = nn.Conv2d(2, 1, 1, bias=False)  # 压缩输入的两个通道到一个通道
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         # 使用全局平均池化和最大池化来获取通道的注意力图
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
-        x = torch.cat([avg_out, max_out], dim=1)
-        x = self.conv(x)
-        return x * self.sigmoid(x)
+        attn = torch.cat([avg_out, max_out], dim=1)
+        attn = self.compress(attn)
+        attn = self.sigmoid(attn)
+        return x * attn
+
 
 class TemporalAttentionModule(nn.Module):
     def __init__(self, channels, heads=8):
@@ -114,18 +116,18 @@ class TemporalAttentionModule(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x):
-        # x should be (Batch, Channel, Time*Height*Width)
+        # x should be reshaped to (Batch, Channel, Time) before being passed here
         B, C, T = x.size()
         q = self.query(x).view(B, self.heads, C // self.heads, T)
         k = self.key(x).view(B, self.heads, C // self.heads, T)
         v = self.value(x).view(B, self.heads, C // self.heads, T)
 
-        # Transpose for matrix multiplication
-        q = q.permute(0, 1, 3, 2)  # (Batch, Heads, T, Channels/Heads)
-        k = k.permute(0, 1, 3, 2)  # (Batch, Heads, T, Channels/Heads)
+        q = q.permute(0, 1, 3, 2)  # Prepare for batch matrix multiplication
+        k = k.permute(0, 1, 3, 2)
         attn = self.softmax(torch.matmul(q, k.transpose(-2, -1)) * self.scale)
         x = torch.matmul(attn, v).view(B, C, T)
         return x
+
 
 # SimVP class for training
 class SimVP(nn.Module):
