@@ -44,7 +44,7 @@ class Decoder(nn.Module):
 
 import torch
 from torch import nn
-import torch.nn.functional as F
+from modules import Inception
 
 class SpatialAttention(nn.Module):
     def __init__(self):
@@ -53,48 +53,51 @@ class SpatialAttention(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
+        # 计算平均和最大池化
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
         x = torch.cat([avg_out, max_out], dim=1)
         x = self.conv1(x)
-        return x * self.sigmoid(x)
+        return x * self.sigmoid(x)  # 广播乘法，保持维度不变
 
 class Mid_Xnet(nn.Module):
     def __init__(self, channel_in, channel_hid, N_T, incep_ker=[3, 5, 7, 11], groups=8):
         super(Mid_Xnet, self).__init__()
         self.N_T = N_T
 
-        # Create encoder and decoder layers
-        self.enc = nn.ModuleList()
-        self.dec = nn.ModuleList()
-        self.spatial_att = SpatialAttention()
+        # 初始化编解码层和注意力层
+        self.enc_layers = nn.ModuleList()
+        self.dec_layers = nn.ModuleList()
+        self.attention_layers = nn.ModuleList([SpatialAttention() for _ in range(2 * N_T)])  # 每层后都有注意力
 
-        # Initialize Inception layers and add spatial attention to each layer
-        self.enc.append(Inception(channel_in, channel_hid // 2, channel_hid, incep_ker, groups))
+        # 创建Inception层
+        self.enc_layers.append(Inception(channel_in, channel_hid // 2, channel_hid, incep_ker, groups))
         for _ in range(1, N_T):
-            self.enc.append(Inception(channel_hid, channel_hid // 2, channel_hid, incep_ker, groups))
+            self.enc_layers.append(Inception(channel_hid, channel_hid // 2, channel_hid, incep_ker, groups))
 
-        self.dec.append(Inception(channel_hid, channel_hid // 2, channel_hid, incep_ker, groups))
-        for _ in range(1, N_T - 1):
-            self.dec.append(Inception(2 * channel_hid, channel_hid // 2, channel_hid, incep_ker, groups))
-        self.dec.append(Inception(2 * channel_hid, channel_hid // 2, channel_in, incep_ker, groups))
+        self.dec_layers.append(Inception(channel_hid, channel_hid // 2, channel_hid, incep_ker, groups))
+        for _ in range(1, N_T-1):
+            self.dec_layers.append(Inception(2 * channel_hid, channel_hid // 2, channel_hid, incep_ker, groups))
+        self.dec_layers.append(Inception(2 * channel_hid, channel_hid // 2, channel_in, incep_ker, groups))
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.reshape(B, T * C, H, W)
+        x = x.reshape(B, T*C, H, W)
 
+        # Encoder with attention
         skips = []
-        for i, layer in enumerate(self.enc):
+        for i, layer in enumerate(self.enc_layers):
             x = layer(x)
-            x = self.spatial_att(x)
-            if i < len(self.enc) - 1:
+            x = self.attention_layers[i](x)  # 应用注意力机制
+            if i < len(self.enc_layers) - 1:
                 skips.append(x)
 
-        for i, layer in enumerate(self.dec):
+        # Decoder with attention
+        for i, layer in enumerate(self.dec_layers):
             if i > 0:
                 x = torch.cat([x, skips[-i]], dim=1)
             x = layer(x)
-            x = self.spatial_att(x)
+            x = self.attention_layers[len(self.enc_layers) + i](x)  # 应用注意力机制
 
         y = x.reshape(B, T, C, H, W)
         return y
