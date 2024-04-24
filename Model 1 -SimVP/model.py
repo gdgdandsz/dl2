@@ -43,28 +43,39 @@ class Decoder(nn.Module):
         return Y
 
 
-# Mid_Xnet module
+import torch
+from torch import nn
+from modules import Inception
+
 class Mid_Xnet(nn.Module):
-    def __init__(self, channel_in, channel_hid, N_T, incep_ker = [3,5,7,11], groups=8):
+    def __init__(self, channel_in, channel_hid, N_T, incep_ker=[3,5,7,11], groups=8):
         super(Mid_Xnet, self).__init__()
 
         self.N_T = N_T
-        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=channel_hid, num_heads=8, batch_first=True)
+        
+        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups)]
         for i in range(1, N_T-1):
-            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
-        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
+            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
+        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
 
-        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
+        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups)]
         for i in range(1, N_T-1):
-            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
-        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker= incep_ker, groups=groups))
+            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
+        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker=incep_ker, groups=groups))
 
         self.enc = nn.Sequential(*enc_layers)
         self.dec = nn.Sequential(*dec_layers)
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.reshape(B, T*C, H, W)
+        x = x.view(B, T, C*H*W)  # Flatten spatial dimensions for attention
+
+        # Applying Multihead Attention
+        attn_output, _ = self.multihead_attn(x, x, x)
+        x = attn_output.view(B, T, C, H, W)  # Reshape back to original spatial dimensions
+
+        x = x.view(B, T*C, H, W)  # Reshape for Inception blocks
 
         # Encoder
         skips = []
@@ -75,11 +86,10 @@ class Mid_Xnet(nn.Module):
                 skips.append(z)
 
         # Decoder
-        z = self.dec[0](z)
         for i in range(1, self.N_T):
             z = self.dec[i](torch.cat([z, skips[-i]], dim=1))
 
-        y = z.reshape(B, T, C, H, W)
+        y = z.view(B, T, C, H, W)
         return y
 
 # SimVP class for training
