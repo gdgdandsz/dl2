@@ -58,7 +58,7 @@ class Mid_Xnet(nn.Module):
         self.N_T = N_T
         # 使用channel_hid作为基准维度可以，但我们需要确保它是512
         self.downscale = nn.Linear(channel_hid * H * W, 512)  # 从C*H*W降到512
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=512, num_heads=8, batch_first=True)
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=512, num_heads=2, batch_first=True)
 
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
         for i in range(1, N_T-1):
