@@ -49,12 +49,12 @@ from modules import Inception
 class Mid_Xnet(nn.Module):
     def __init__(self, channel_in, channel_hid, N_T, H, W, incep_ker, groups):
         super(Mid_Xnet, self).__init__()
-
         self.N_T = N_T
-        # 将输入数据降维至合理的尺寸，512维可能仍然过高，取决于你的具体应用和可用内存
-        self.downscale = nn.Linear(H * W, 128)  # 从H*W降到一个更小的维度
+        input_dim = channel_hid * H * W  # 具体维度取决于之前层的输出，确保这里是正确的
+        self.downscale = nn.Linear(input_dim, 128)  # 确保这里的input_dim与实际输入尺寸一致
         self.multihead_attn = nn.MultiheadAttention(embed_dim=128, num_heads=8, batch_first=True)
 
+        # Inception层定义保持不变
         enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
         for i in range(1, N_T-1):
             enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker, groups))
@@ -97,6 +97,7 @@ class Mid_Xnet(nn.Module):
 
         y = z.view(B, T, C, H, W)
         return y
+
 
 
 
