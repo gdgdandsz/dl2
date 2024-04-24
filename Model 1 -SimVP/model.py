@@ -43,7 +43,7 @@ class Decoder(nn.Module):
         return Y
 
 class PostProcessingAttention(nn.Module):
-    def __init__(self, channels, num_heads=8):
+    def __init__(self, channels, num_heads=1):
         super(PostProcessingAttention, self).__init__()
         self.attention = nn.MultiheadAttention(embed_dim=channels, num_heads=num_heads, batch_first=True)
 
