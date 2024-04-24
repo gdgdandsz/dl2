@@ -42,43 +42,61 @@ class Decoder(nn.Module):
         Y = self.readout(Y)
         return Y
 
-# Mid_Xnet module
+import torch
+from torch import nn
+import torch.nn.functional as F
+
+class SpatialAttention(nn.Module):
+    def __init__(self):
+        super(SpatialAttention, self).__init__()
+        self.conv1 = nn.Conv2d(2, 1, kernel_size=7, padding=3, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv1(x)
+        return x * self.sigmoid(x)
+
 class Mid_Xnet(nn.Module):
-    def __init__(self, channel_in, channel_hid, N_T, incep_ker = [3,5,7,11], groups=8):
+    def __init__(self, channel_in, channel_hid, N_T, incep_ker=[3, 5, 7, 11], groups=8):
         super(Mid_Xnet, self).__init__()
-
         self.N_T = N_T
-        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
-        for i in range(1, N_T-1):
-            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
-        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
 
-        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups)]
-        for i in range(1, N_T-1):
-            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker= incep_ker, groups=groups))
-        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker= incep_ker, groups=groups))
+        # Create encoder and decoder layers
+        self.enc = nn.ModuleList()
+        self.dec = nn.ModuleList()
+        self.spatial_att = SpatialAttention()
 
-        self.enc = nn.Sequential(*enc_layers)
-        self.dec = nn.Sequential(*dec_layers)
+        # Initialize Inception layers and add spatial attention to each layer
+        self.enc.append(Inception(channel_in, channel_hid // 2, channel_hid, incep_ker, groups))
+        for _ in range(1, N_T):
+            self.enc.append(Inception(channel_hid, channel_hid // 2, channel_hid, incep_ker, groups))
+
+        self.dec.append(Inception(channel_hid, channel_hid // 2, channel_hid, incep_ker, groups))
+        for _ in range(1, N_T - 1):
+            self.dec.append(Inception(2 * channel_hid, channel_hid // 2, channel_hid, incep_ker, groups))
+        self.dec.append(Inception(2 * channel_hid, channel_hid // 2, channel_in, incep_ker, groups))
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.reshape(B, T*C, H, W)
+        x = x.reshape(B, T * C, H, W)
 
-        # Encoder
         skips = []
-        z = x
-        for i in range(self.N_T):
-            z = self.enc[i](z)
-            if i < self.N_T - 1:
-                skips.append(z)
+        for i, layer in enumerate(self.enc):
+            x = layer(x)
+            x = self.spatial_att(x)
+            if i < len(self.enc) - 1:
+                skips.append(x)
 
-        # Decoder
-        z = self.dec[0](z)
-        for i in range(1, self.N_T):
-            z = self.dec[i](torch.cat([z, skips[-i]], dim=1))
+        for i, layer in enumerate(self.dec):
+            if i > 0:
+                x = torch.cat([x, skips[-i]], dim=1)
+            x = layer(x)
+            x = self.spatial_att(x)
 
-        y = z.reshape(B, T, C, H, W)
+        y = x.reshape(B, T, C, H, W)
         return y
 
 # SimVP class for training
