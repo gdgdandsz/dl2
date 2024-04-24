@@ -52,30 +52,33 @@ class Mid_Xnet(nn.Module):
         super(Mid_Xnet, self).__init__()
 
         self.N_T = N_T
+        # Assuming that each Inception layer outputs channel_hid channels
         self.multihead_attn = nn.MultiheadAttention(embed_dim=channel_hid, num_heads=8, batch_first=True)
-        
-        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups)]
-        for i in range(1, N_T-1):
-            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
-        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
 
-        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups)]
+        enc_layers = [Inception(channel_in, channel_hid//2, channel_hid, incep_ker, groups)]
         for i in range(1, N_T-1):
-            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker=incep_ker, groups=groups))
-        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker=incep_ker, groups=groups))
+            enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker, groups))
+        enc_layers.append(Inception(channel_hid, channel_hid//2, channel_hid, incep_ker, groups))
+
+        dec_layers = [Inception(channel_hid, channel_hid//2, channel_hid, incep_ker, groups)]
+        for i in range(1, N_T-1):
+            dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_hid, incep_ker, groups))
+        dec_layers.append(Inception(2*channel_hid, channel_hid//2, channel_in, incep_ker, groups))
 
         self.enc = nn.Sequential(*enc_layers)
         self.dec = nn.Sequential(*dec_layers)
 
     def forward(self, x):
         B, T, C, H, W = x.shape
-        x = x.view(B, T, C*H*W)  # Flatten spatial dimensions for attention
+        # Flattening spatial dimensions for attention, assume each feature map as a separate feature
+        x = x.view(B, T, C * H * W)
 
         # Applying Multihead Attention
         attn_output, _ = self.multihead_attn(x, x, x)
-        x = attn_output.view(B, T, C, H, W)  # Reshape back to original spatial dimensions
+        # Reshape to original spatial dimensions
+        x = attn_output.view(B, T, C, H, W)
 
-        x = x.view(B, T*C, H, W)  # Reshape for Inception blocks
+        x = x.reshape(B, T * C, H, W)  # Reshape for Inception blocks
 
         # Encoder
         skips = []
@@ -91,6 +94,7 @@ class Mid_Xnet(nn.Module):
 
         y = z.view(B, T, C, H, W)
         return y
+
 
 # SimVP class for training
 class SimVP(nn.Module):
