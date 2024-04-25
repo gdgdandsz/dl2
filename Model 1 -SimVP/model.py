@@ -46,26 +46,30 @@ class PostProcessingAttention(nn.Module):
     def __init__(self, C, T, num_heads=1):
         super(PostProcessingAttention, self).__init__()
         self.num_heads = num_heads
-        # Embedding dimension needs to be divisible by the number of heads
-        embed_dim = C * T
+        self.T = T
+        self.C = C
+        embed_dim = C * T  # This needs to be divisible by num_heads
+
         if embed_dim % num_heads != 0:
             raise ValueError(f"Embedding dimension ({embed_dim}) must be divisible by the number of heads ({num_heads}).")
         
         self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads, batch_first=True)
 
     def forward(self, x):
-        # Assume input x is in shape [B, T, C, H, W]
+        # x should be [B, T, C, H, W]
         B, T, C, H, W = x.shape
-        # Flatten H and W dimensions into the channel dimension
+        # Reshape x to [B, T, C*H*W] for attention
         x = x.reshape(B, T, C * H * W)
 
-        # Apply attention across the temporal dimension
-        x = x.transpose(1, 2)  # Change shape to [B, C*H*W, T] to fit attention
-        attn_output, _ = self.attention(x, x, x)
+        # Attention expects [B, S, E] where S is the sequence length and E is the embedding dimension
+        # Transpose to fit attention input expectations
+        x = x.transpose(1, 2)  # Now x is [B, C*H*W, T]
+        attn_output, _ = self.attention(x, x, x)  # Apply attention
 
-        # Reshape back to the original dimension (if needed)
+        # Reshape and transpose back to original
         attn_output = attn_output.transpose(1, 2).reshape(B, T, C, H, W)
         return attn_output
+
 
 
 
