@@ -123,7 +123,7 @@ class SimVP(nn.Module):
         self.hid = Mid_Xnet(T*hid_S, hid_T, N_T, incep_ker, groups)
         self.dec = Decoder(hid_S, C, N_S)
         # In SimVP initialization
-        self.post_attention = PostProcessingAttention(embed_dim=C*H*W, num_heads=1)
+        self.post_attention = PostProcessingAttention(embed_dim=C*H*W)
         
     def forward(self, x_raw):
         B, T, C, H, W = x_raw.shape
