@@ -43,31 +43,38 @@ class Decoder(nn.Module):
         return Y
 
 class PostProcessingAttention(nn.Module):
-    def __init__(self, channels, num_heads=1):
+    def __init__(self, channels, num_heads=8):
         super(PostProcessingAttention, self).__init__()
-        # Ensure the number of heads is a divisor of the number of channels
+        self.num_heads = num_heads
         if channels % num_heads != 0:
-            raise ValueError("Number of channels must be divisible by number of heads for multi-head attention")
+            raise ValueError("channels must be divisible by num_heads")
         self.attention = nn.MultiheadAttention(embed_dim=channels, num_heads=num_heads, batch_first=True)
 
     def forward(self, x):
         original_shape = x.shape
-        if len(original_shape) != 5:
-            raise ValueError("Expected 5D input tensor [B, T, C, H, W] but got shape {}".format(original_shape))
+        print("Original shape:", original_shape)  # Debug information
 
-        B, T, C, H, W = original_shape
-        # Reshape to [B*T, C, H*W] for attention, treating spatial dimensions as sequence
-        x = x.permute(0, 1, 3, 4, 2).reshape(B * T, H * W, C)  # Reshape for attention: [batch, seq_len, features]
+        # Check input dimensions and reshape
+        if len(original_shape) == 5:  # Assuming [B, T, C, H, W]
+            B, T, C, H, W = original_shape
+            x = x.reshape(B, T, C * H * W)  # Flatten spatial dimensions
+            print("Reshaped for attention:", x.shape)  # Debug information
+
+        # Assuming the attention should treat time as sequence and merge other dimensions
+        x = x.permute(0, 2, 1)  # Change to [B, C*H*W, T] if time sequence should be preserved
+        x = x.flatten(1)  # Flatten all but the batch dimension
+        print("Flattened input to attention:", x.shape)  # Debug information
 
         # Apply attention
-        x = x.permute(2, 0, 1)  # Permute for MultiheadAttention: [seq_len, batch, features]
         attn_output, _ = self.attention(x, x, x)
-        x = attn_output.permute(1, 2, 0)  # Permute back: [batch, features, seq_len]
+        print("Output from attention:", attn_output.shape)  # Debug information
 
-        # Reshape back to the original shape after attention
-        x = x.view(B, T, H, W, C).permute(0, 1, 4, 2, 3)  # Reshape back to [B, T, C, H, W]
+        # Reshape back to original
+        # This step will depend on what you actually need to output
+        y = attn_output.view(B, T, C, H, W)  # Reshape back if needed
+        print("Reshaped back to original:", y.shape)  # Debug information
 
-        return x
+        return y
 
 
 
