@@ -123,7 +123,7 @@ class SimVP(nn.Module):
         self.hid = Mid_Xnet(T*hid_S, hid_T, N_T, incep_ker, groups)
         self.dec = Decoder(hid_S, C, N_S)
         # In SimVP initialization
-        self.post_attention = PostProcessingAttention(C, T)
+        self.post_attention = PostProcessingAttention(embed_dim=C*H*W, num_heads=1)
         
     def forward(self, x_raw):
         B, T, C, H, W = x_raw.shape
@@ -138,5 +138,9 @@ class SimVP(nn.Module):
 
         y = self.dec(hid, skip)
         y = y.view(B, T, C, H, W)  # Reshape before attention
-        y = self.post_attention(y)  # Apply attention
-        return y
+       # Reshape for attention - assuming flattening happens here
+        Y_flat = y.view(B, -1, C*H*W)  # Reshape to [Batch, Time, Features]
+        Y_att = self.post_attention(Y_flat)
+        Y_final = Y_att.view(B, T, C, H, W)
+
+        return Y_final
