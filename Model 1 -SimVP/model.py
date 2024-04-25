@@ -43,7 +43,7 @@ class Decoder(nn.Module):
         return Y
 
 class PostProcessingAttention(nn.Module):
-    def __init__(self, channels, num_heads=4):
+    def __init__(self, channels, num_heads=2):
         super(PostProcessingAttention, self).__init__()
         # Ensure the number of heads is a divisor of the number of channels
         if channels % num_heads != 0:
