@@ -41,40 +41,33 @@ class Decoder(nn.Module):
         Y = self.dec[-1](torch.cat([hid, enc1], dim=1))
         Y = self.readout(Y)
         return Y
-
+        
 class PostProcessingAttention(nn.Module):
-    def __init__(self, channels, num_heads=1):
+    def __init__(self, C, T, num_heads=1):
         super(PostProcessingAttention, self).__init__()
         self.num_heads = num_heads
-        if channels % num_heads != 0:
-            raise ValueError("channels must be divisible by num_heads")
-        self.attention = nn.MultiheadAttention(embed_dim=channels, num_heads=num_heads, batch_first=True)
+        # Embedding dimension needs to be divisible by the number of heads
+        embed_dim = C * T
+        if embed_dim % num_heads != 0:
+            raise ValueError(f"Embedding dimension ({embed_dim}) must be divisible by the number of heads ({num_heads}).")
+        
+        self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads, batch_first=True)
 
     def forward(self, x):
-        original_shape = x.shape
-        print("Original shape:", original_shape)  # Debug information
+        # Assume input x is in shape [B, T, C, H, W]
+        B, T, C, H, W = x.shape
+        # Flatten H and W dimensions into the channel dimension
+        x = x.reshape(B, T, C * H * W)
 
-        # Check input dimensions and reshape
-        if len(original_shape) == 5:  # Assuming [B, T, C, H, W]
-            B, T, C, H, W = original_shape
-            x = x.reshape(B, T, C * H * W)  # Flatten spatial dimensions
-            print("Reshaped for attention:", x.shape)  # Debug information
-
-        # Assuming the attention should treat time as sequence and merge other dimensions
-        x = x.permute(0, 2, 1)  # Change to [B, C*H*W, T] if time sequence should be preserved
-        x = x.flatten(1)  # Flatten all but the batch dimension
-        print("Flattened input to attention:", x.shape)  # Debug information
-
-        # Apply attention
+        # Apply attention across the temporal dimension
+        x = x.transpose(1, 2)  # Change shape to [B, C*H*W, T] to fit attention
         attn_output, _ = self.attention(x, x, x)
-        print("Output from attention:", attn_output.shape)  # Debug information
 
-        # Reshape back to original
-        # This step will depend on what you actually need to output
-        y = attn_output.view(B, T, C, H, W)  # Reshape back if needed
-        print("Reshaped back to original:", y.shape)  # Debug information
+        # Reshape back to the original dimension (if needed)
+        attn_output = attn_output.transpose(1, 2).reshape(B, T, C, H, W)
+        return attn_output
 
-        return y
+
 
 
 
@@ -125,8 +118,9 @@ class SimVP(nn.Module):
         self.enc = Encoder(C, hid_S, N_S)
         self.hid = Mid_Xnet(T*hid_S, hid_T, N_T, incep_ker, groups)
         self.dec = Decoder(hid_S, C, N_S)
-        self.post_attention = PostProcessingAttention(C)  # Attention after the decoder
-
+        # In SimVP initialization
+        self.post_attention = PostProcessingAttention(C, T)
+        
     def forward(self, x_raw):
         B, T, C, H, W = x_raw.shape
         x = x_raw.view(B*T, C, H, W)
