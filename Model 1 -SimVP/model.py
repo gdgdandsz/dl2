@@ -43,31 +43,13 @@ class Decoder(nn.Module):
         return Y
         
 class PostProcessingAttention(nn.Module):
-    def __init__(self, C, T, num_heads=1):
+    def __init__(self, embed_dim, num_heads=1):
         super(PostProcessingAttention, self).__init__()
-        self.num_heads = num_heads
-        self.T = T
-        self.C = C
-        embed_dim = C * T  # This needs to be divisible by num_heads
-
-        if embed_dim % num_heads != 0:
-            raise ValueError(f"Embedding dimension ({embed_dim}) must be divisible by the number of heads ({num_heads}).")
-        
         self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads, batch_first=True)
-
+        
     def forward(self, x):
-        # x should be [B, T, C, H, W]
-        B, T, C, H, W = x.shape
-        # Reshape x to [B, T, C*H*W] for attention
-        x = x.reshape(B, T, C * H * W)
-
-        # Attention expects [B, S, E] where S is the sequence length and E is the embedding dimension
-        # Transpose to fit attention input expectations
-        x = x.transpose(1, 2)  # Now x is [B, C*H*W, T]
-        attn_output, _ = self.attention(x, x, x)  # Apply attention
-
-        # Reshape and transpose back to original
-        attn_output = attn_output.transpose(1, 2).reshape(B, T, C, H, W)
+        # x shape should be [Batch, Sequence, Features]
+        attn_output, _ = self.attention(x, x, x)
         return attn_output
 
 
