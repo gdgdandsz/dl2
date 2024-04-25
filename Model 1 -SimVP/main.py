@@ -12,7 +12,7 @@ def create_parser():
     parser.add_argument('--res_dir', default='./results', type=str)
     parser.add_argument('--ex_name', default='Debug', type=str)
     parser.add_argument('--use_gpu', default=True, type=bool)
-    parser.add_argument('--gpu', default='0', type=str)
+    parser.add_argument('--gpu', default='0, 1', type=str)
     parser.add_argument('--seed', default=1, type=int)
 
     # dataset parameters
@@ -31,7 +31,7 @@ def create_parser():
     parser.add_argument('--groups', default=4, type=int)
 
     # Training parameters
-    parser.add_argument('--epochs', default=3, type=int)
+    parser.add_argument('--epochs', default=100, type=int)
     parser.add_argument('--log_step', default=1, type=int)
     parser.add_argument('--lr', default=0.001, type=float, help='Learning rate')
     return parser
@@ -50,25 +50,10 @@ def main_module():
     print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>  start <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     exp.train(args)
     print('>>>>>>>>>>>>>>>>>>>>>>>>>>>> testing <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-    def validate_model(model, loader, device):
-        model.eval()
-        total_loss = 0
-        criterion = torch.nn.MSELoss()  # 使用 MSE 作为损失函数
-        with torch.no_grad():
-            for data, target in loader:
-                data, target = data.to(device), target.to(device)
-                output = model(data)
-                loss = criterion(output, target)
-                total_loss += loss.item() * data.size(0)
-        
-        mse = total_loss / len(loader.dataset)
-        print(f"Test MSE: {mse}")
-        return mse
-
-    # 假设你已经有了数据加载器和模型
-    mse = validate_model(model, val_loader, device)
-
-    wandb.log({"test_final_mse": mse})
+    try:
+        wandb.log({"test_final_mse": mse})
+    except:
+        pass
 
     print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>  end <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
     wandb.finish()
