@@ -41,20 +41,6 @@ class Decoder(nn.Module):
         Y = self.dec[-1](torch.cat([hid, enc1], dim=1))
         Y = self.readout(Y)
         return Y
-        
-class PostProcessingAttention(nn.Module):
-    def __init__(self, embed_dim, num_heads=1):
-        super(PostProcessingAttention, self).__init__()
-        self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads, batch_first=True)
-        
-    def forward(self, x):
-        # x shape should be [Batch, Sequence, Features]
-        attn_output, _ = self.attention(x, x, x)
-        return attn_output
-
-
-
-
 
 
 # Mid_Xnet module
@@ -104,9 +90,8 @@ class SimVP(nn.Module):
         self.enc = Encoder(C, hid_S, N_S)
         self.hid = Mid_Xnet(T*hid_S, hid_T, N_T, incep_ker, groups)
         self.dec = Decoder(hid_S, C, N_S)
-        # In SimVP initialization
-        self.post_attention = PostProcessingAttention(embed_dim=C*H*W)
-        
+
+
     def forward(self, x_raw):
         B, T, C, H, W = x_raw.shape
         x = x_raw.view(B*T, C, H, W)
@@ -118,11 +103,6 @@ class SimVP(nn.Module):
         hid = self.hid(z)
         hid = hid.reshape(B*T, C_, H_, W_)
 
-        y = self.dec(hid, skip)
-        y = y.view(B, T, C, H, W)  # Reshape before attention
-       # Reshape for attention - assuming flattening happens here
-        Y_flat = y.view(B, -1, C*H*W)  # Reshape to [Batch, Time, Features]
-        Y_att = self.post_attention(Y_flat)
-        Y_final = Y_att.view(B, T, C, H, W)
-
-        return Y_final
+        Y = self.dec(hid, skip)
+        Y = Y.reshape(B, T, C, H, W)
+        return Y
