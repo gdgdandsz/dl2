@@ -81,7 +81,7 @@ class Exp:
 
     def _select_optimizer(self):
         self.optimizer = torch.optim.Adam(
-            self.model.parameters(), lr=self.wandb_config.lr,weight_decay=1e-4)
+            self.model.parameters(), lr=self.wandb_config.lr,weight_decay=5e-5)
         self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
             self.optimizer, max_lr=self.wandb_config.lr, steps_per_epoch=len(self.train_loader), epochs=self.args.epochs)
         return self.optimizer
