@@ -355,7 +355,7 @@ if __name__ == "__main__":
             early_stop = True
             print("Early Stopping")
 
-    check_accuracy(val_dataloader, best_model)
+    #check_accuracy(val_dataloader, best_model)
 
 # if __name__=='__main__':
 #    sweep_configuration = {
